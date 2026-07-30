@@ -18,3 +18,12 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </Provider>
   </React.StrictMode>
 );
+
+// Registered post-load so it never delays the initial render — this only
+// makes the app installable and speeds up repeat static-asset loads (see
+// public/sw.js for exactly what it does and does not cache).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
