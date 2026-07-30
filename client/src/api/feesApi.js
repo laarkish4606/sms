@@ -74,3 +74,7 @@ export const {
 export function receiptDownloadUrl(paymentId) {
   return `${import.meta.env.VITE_API_URL || '/api/v1'}/fees/payments/${paymentId}/receipt`;
 }
+
+export function invoiceDownloadUrl(invoiceId) {
+  return `${import.meta.env.VITE_API_URL || '/api/v1'}/fees/invoices/${invoiceId}/download`;
+}

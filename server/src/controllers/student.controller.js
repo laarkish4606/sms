@@ -8,6 +8,7 @@ import ApiError from '../utils/ApiError.js';
 import { sendSuccess } from '../utils/ApiResponse.js';
 import ApiFeatures from '../utils/apiFeatures.js';
 import { generateStudentId } from '../services/idGenerator.service.js';
+import { streamExcel } from '../services/excel.service.js';
 
 const POPULATE = [
   { path: 'class', select: 'name numericOrder' },
@@ -93,7 +94,7 @@ export const getMyStudentProfile = asyncHandler(async (req, res) => {
 export const listStudents = asyncHandler(async (req, res) => {
   const filter = { school: req.schoolId };
   const { data, meta } = await new ApiFeatures(
-    Student.find(filter).populate(POPULATE),
+    Student.find(filter).populate(POPULATE).lean(),
     req.query,
     ['firstName', 'lastName', 'admissionNumber']
   )
@@ -170,6 +171,52 @@ export const uploadStudentPhoto = asyncHandler(async (req, res) => {
   );
   if (!student) throw ApiError.notFound('Student not found');
   sendSuccess(res, { message: 'Photo uploaded', data: { photo: student.photo } });
+});
+
+export const exportStudents = asyncHandler(async (req, res) => {
+  const filter = { school: req.schoolId };
+  const { data } = await new ApiFeatures(
+    Student.find(filter).populate(POPULATE),
+    { ...req.query, limit: 5000 },
+    ['firstName', 'lastName', 'admissionNumber']
+  )
+    .filter()
+    .search()
+    .sort()
+    .paginate()
+    .exec();
+
+  const rows = data.map((s) => ({
+    admissionNumber: s.admissionNumber,
+    firstName: s.firstName,
+    lastName: s.lastName,
+    email: s.email,
+    class: s.class?.name || '',
+    section: s.section?.name || '',
+    rollNumber: s.rollNumber || '',
+    gender: s.gender,
+    dob: s.dob ? s.dob.toISOString().slice(0, 10) : '',
+    status: s.status,
+  }));
+
+  await streamExcel(
+    res,
+    'students.xlsx',
+    'Students',
+    [
+      { header: 'Admission No', key: 'admissionNumber', width: 18 },
+      { header: 'First Name', key: 'firstName', width: 18 },
+      { header: 'Last Name', key: 'lastName', width: 18 },
+      { header: 'Email', key: 'email', width: 26 },
+      { header: 'Class', key: 'class', width: 14 },
+      { header: 'Section', key: 'section', width: 12 },
+      { header: 'Roll No', key: 'rollNumber', width: 12 },
+      { header: 'Gender', key: 'gender', width: 10 },
+      { header: 'DOB', key: 'dob', width: 14 },
+      { header: 'Status', key: 'status', width: 12 },
+    ],
+    rows
+  );
 });
 
 export const promoteStudents = asyncHandler(async (req, res) => {

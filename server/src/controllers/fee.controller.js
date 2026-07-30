@@ -11,7 +11,7 @@ import { sendSuccess } from '../utils/ApiResponse.js';
 import ApiFeatures from '../utils/apiFeatures.js';
 import crudFactory from '../utils/crudFactory.js';
 import { generateInvoiceNumber, generateReceiptNumber } from '../services/idGenerator.service.js';
-import { streamPdf, drawReceipt } from '../services/pdf.service.js';
+import { streamPdf, drawReceipt, drawInvoice } from '../services/pdf.service.js';
 
 // ---- Fee structures ----
 
@@ -77,9 +77,24 @@ export const listInvoices = asyncHandler(async (req, res) => {
     filter.student = { $in: parent?.children || [] };
   }
 
+  // Invoice has no `class` field of its own — resolve it to the set of
+  // students in that class so the list can be narrowed to one generated
+  // batch (e.g. right after "Generate Invoices" for a specific grade).
+  const { class: classId, ...restQuery } = req.query;
+  if (classId) {
+    const studentsInClass = await Student.find({ school: req.schoolId, class: classId }).select('_id');
+    const classStudentIds = studentsInClass.map((s) => s._id.toString());
+    if (filter.student) {
+      const existing = filter.student.$in ? filter.student.$in.map(String) : [filter.student.toString()];
+      filter.student = { $in: existing.filter((id) => classStudentIds.includes(id)) };
+    } else {
+      filter.student = { $in: classStudentIds };
+    }
+  }
+
   const { data, meta } = await new ApiFeatures(
     Invoice.find(filter).populate('student', 'firstName lastName admissionNumber'),
-    req.query,
+    restQuery,
     ['invoiceNumber']
   )
     .filter()
@@ -110,6 +125,25 @@ export const getInvoice = asyncHandler(async (req, res) => {
   );
   if (!invoice) throw ApiError.notFound('Invoice not found');
   sendSuccess(res, { data: invoice });
+});
+
+export const downloadInvoicePdf = asyncHandler(async (req, res) => {
+  const invoice = await Invoice.findOne({ _id: req.params.id, school: req.schoolId });
+  if (!invoice) throw ApiError.notFound('Invoice not found');
+
+  if (req.user.role === 'student') {
+    const student = await Student.findOne({ user: req.user._id });
+    if (!student || student._id.toString() !== invoice.student.toString()) {
+      throw ApiError.forbidden('You may only view your own invoices');
+    }
+  } else if (req.user.role === 'parent') {
+    const parent = await Parent.findOne({ user: req.user._id, children: invoice.student });
+    if (!parent) throw ApiError.forbidden("You may only view your own children's invoices");
+  }
+
+  const [student, school] = await Promise.all([Student.findById(invoice.student), School.findById(req.schoolId)]);
+
+  streamPdf(res, `${invoice.invoiceNumber}.pdf`, (doc) => drawInvoice(doc, { school, invoice, student }));
 });
 
 // ---- Payments ----

@@ -19,7 +19,7 @@ export default function ExamResultsPage() {
       key: 'result',
       header: 'Result',
       render: (r) => (
-        <span className={`badge ${r.result === 'PASS' ? 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400'}`}>
+        <span className={r.result === 'PASS' ? 'badge-success' : 'badge-danger'}>
           {r.result}
         </span>
       ),

@@ -1,11 +1,17 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { Plus, Ban } from 'lucide-react';
+import { Plus, Ban, RotateCcw, Trash2 } from 'lucide-react';
 import DataTable from '../../components/DataTable.jsx';
 import Modal from '../../components/Modal.jsx';
 import ConfirmDialog from '../../components/ConfirmDialog.jsx';
 import Spinner from '../../components/Spinner.jsx';
-import { useListSchoolsQuery, useCreateSchoolMutation, useDeactivateSchoolMutation } from '../../api/usersApi.js';
+import {
+  useListSchoolsQuery,
+  useCreateSchoolMutation,
+  useDeactivateSchoolMutation,
+  useReactivateSchoolMutation,
+  useDeleteSchoolPermanentlyMutation,
+} from '../../api/usersApi.js';
 
 const EMPTY_FORM = {
   name: '',
@@ -22,11 +28,14 @@ const EMPTY_FORM = {
 export default function SchoolsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [deactivating, setDeactivating] = useState(null);
+  const [deleting, setDeleting] = useState(null);
   const [values, setValues] = useState(EMPTY_FORM);
 
   const { data, isLoading, isError } = useListSchoolsQuery({ limit: 50 });
   const [createSchool, { isLoading: creating }] = useCreateSchoolMutation();
   const [deactivateSchool] = useDeactivateSchoolMutation();
+  const [reactivateSchool] = useReactivateSchoolMutation();
+  const [deleteSchoolPermanently, { isLoading: deletingSchool }] = useDeleteSchoolPermanentlyMutation();
 
   const columns = [
     { key: 'name', header: 'Name' },
@@ -36,7 +45,7 @@ export default function SchoolsPage() {
       key: 'isActive',
       header: 'Status',
       render: (r) => (
-        <span className={`badge ${r.isActive ? 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
+        <span className={r.isActive ? 'badge-success' : 'badge-neutral'}>
           {r.isActive ? 'Active' : 'Inactive'}
         </span>
       ),
@@ -44,12 +53,33 @@ export default function SchoolsPage() {
     {
       key: 'actions',
       header: '',
-      render: (r) =>
-        r.isActive && (
-          <button className="text-gray-400 hover:text-red-600" onClick={() => setDeactivating(r)} title="Deactivate">
-            <Ban size={16} />
+      render: (r) => (
+        <div className="flex items-center gap-3">
+          {r.isActive ? (
+            <button className="text-gray-400 hover:text-amber-600" onClick={() => setDeactivating(r)} title="Deactivate">
+              <Ban size={16} />
+            </button>
+          ) : (
+            <button
+              className="text-gray-400 hover:text-green-600"
+              title="Reactivate"
+              onClick={async () => {
+                try {
+                  await reactivateSchool(r._id).unwrap();
+                  toast.success('School reactivated');
+                } catch (err) {
+                  toast.error(err?.data?.message || 'Failed to reactivate');
+                }
+              }}
+            >
+              <RotateCcw size={16} />
+            </button>
+          )}
+          <button className="text-gray-400 hover:text-red-600" onClick={() => setDeleting(r)} title="Delete permanently">
+            <Trash2 size={16} />
           </button>
-        ),
+        </div>
+      ),
     },
   ];
 
@@ -67,9 +97,9 @@ export default function SchoolsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Schools</h1>
-        <button className="btn-primary" onClick={() => setFormOpen(true)}>
+        <button className="btn-primary shrink-0 sm:self-auto" onClick={() => setFormOpen(true)}>
           <Plus size={16} /> Add School
         </button>
       </div>
@@ -145,6 +175,71 @@ export default function SchoolsPage() {
           }
         }}
       />
+
+      <DeleteSchoolModal
+        school={deleting}
+        isDeleting={deletingSchool}
+        onClose={() => setDeleting(null)}
+        onConfirm={async () => {
+          try {
+            await deleteSchoolPermanently(deleting._id).unwrap();
+            toast.success('School permanently deleted');
+            setDeleting(null);
+          } catch (err) {
+            toast.error(err?.data?.message || 'Failed to delete school');
+          }
+        }}
+      />
     </div>
+  );
+}
+
+// Hard delete is irreversible and cascades to every record scoped to the
+// school (users, students, invoices, attendance, ...), so it requires typing
+// the school's code back rather than a single confirm click.
+function DeleteSchoolModal({ school, isDeleting, onClose, onConfirm }) {
+  const [confirmText, setConfirmText] = useState('');
+
+  if (!school) return null;
+  const matches = confirmText.trim().toUpperCase() === school.code.toUpperCase();
+
+  return (
+    <Modal
+      open={Boolean(school)}
+      onClose={() => {
+        setConfirmText('');
+        onClose();
+      }}
+      title="Permanently delete school"
+      size="sm"
+    >
+      <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
+        This permanently deletes <strong>{school.name}</strong> and every record tied to it — users, students,
+        classes, attendance, invoices, payments, everything. This cannot be undone.
+      </p>
+      <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+        Type <strong>{school.code}</strong> to confirm.
+      </p>
+      <input
+        className="input mb-4"
+        value={confirmText}
+        onChange={(e) => setConfirmText(e.target.value)}
+        placeholder={school.code}
+      />
+      <div className="flex justify-end gap-3">
+        <button
+          className="btn-secondary"
+          onClick={() => {
+            setConfirmText('');
+            onClose();
+          }}
+        >
+          Cancel
+        </button>
+        <button className="btn-danger" disabled={!matches || isDeleting} onClick={onConfirm}>
+          {isDeleting ? <Spinner size={16} className="text-white" /> : 'Delete permanently'}
+        </button>
+      </div>
+    </Modal>
   );
 }

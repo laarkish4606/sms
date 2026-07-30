@@ -39,5 +39,8 @@ invoiceSchema.methods.refreshStatus = function refreshStatus() {
 
 invoiceSchema.set('toJSON', { virtuals: true });
 invoiceSchema.index({ school: 1, student: 1, academicYear: 1 });
+// Covers dashboard counts, overdue sweeps, and outstanding-fee reports,
+// which all filter by status (often plus a dueDate range) within a school.
+invoiceSchema.index({ school: 1, status: 1, dueDate: 1 });
 
 export default mongoose.model('Invoice', invoiceSchema);

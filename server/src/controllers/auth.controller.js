@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import User from '../models/User.model.js';
+import School from '../models/School.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/ApiError.js';
 import { sendSuccess } from '../utils/ApiResponse.js';
@@ -7,16 +8,25 @@ import { issueTokens, verifyRefreshToken, REFRESH_COOKIE_NAME, refreshCookieOpti
 import { sendEmail } from '../config/mailer.js';
 import env from '../config/env.js';
 
-function publicUser(user) {
+// `user.school` on the Mongoose document stays a raw ObjectId everywhere
+// (req.schoolId depends on that) — this only shapes the API response, adding
+// the school's name/code alongside it for display purposes (e.g. the
+// dashboard welcome message).
+function publicUser(user, schoolDoc) {
   return {
     id: user._id,
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
     role: user.role,
-    school: user.school,
+    school: schoolDoc ? { id: schoolDoc._id, name: schoolDoc.name, code: schoolDoc.code, logo: schoolDoc.logo } : user.school,
     avatar: user.avatar,
   };
+}
+
+async function loadSchool(schoolId) {
+  if (!schoolId) return null;
+  return School.findById(schoolId).select('name code logo');
 }
 
 export const login = asyncHandler(async (req, res) => {
@@ -32,8 +42,10 @@ export const login = asyncHandler(async (req, res) => {
   user.lastLogin = new Date();
   await user.save({ validateBeforeSave: false });
 
+  const schoolDoc = await loadSchool(user.school);
+
   res.cookie(REFRESH_COOKIE_NAME, refreshToken, refreshCookieOptions());
-  sendSuccess(res, { message: 'Login successful', data: { user: publicUser(user), accessToken } });
+  sendSuccess(res, { message: 'Login successful', data: { user: publicUser(user, schoolDoc), accessToken } });
 });
 
 export const refresh = asyncHandler(async (req, res) => {
@@ -61,7 +73,8 @@ export const logout = asyncHandler(async (req, res) => {
 });
 
 export const getMe = asyncHandler(async (req, res) => {
-  sendSuccess(res, { data: publicUser(req.user) });
+  const schoolDoc = await loadSchool(req.user.school);
+  sendSuccess(res, { data: publicUser(req.user, schoolDoc) });
 });
 
 export const forgotPassword = asyncHandler(async (req, res) => {

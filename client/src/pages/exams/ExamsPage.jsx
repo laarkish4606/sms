@@ -26,8 +26,11 @@ export default function ExamsPage() {
 
   const { data: myProfile } = useGetMyStudentProfileQuery(undefined, { skip: user?.role !== 'student' });
   const { data: myChildren } = useGetMyChildrenQuery(undefined, { skip: user?.role !== 'parent' });
+  const children = myChildren?.data || [];
+  const [selectedChild, setSelectedChild] = useState('');
+  const activeChildId = selectedChild || children[0]?._id;
   const reportCardStudentId =
-    user?.role === 'student' ? myProfile?.data?._id : user?.role === 'parent' ? myChildren?.data?.[0]?._id : null;
+    user?.role === 'student' ? myProfile?.data?._id : user?.role === 'parent' ? activeChildId : null;
 
   const columns = [
     { key: 'name', header: 'Exam' },
@@ -37,9 +40,7 @@ export default function ExamsPage() {
       key: 'status',
       header: 'Status',
       render: (r) => (
-        <span
-          className={`badge ${r.isPublished ? 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'}`}
-        >
+        <span className={r.isPublished ? 'badge-success' : 'badge-neutral'}>
           {r.isPublished ? 'Published' : 'Draft'}
         </span>
       ),
@@ -89,6 +90,15 @@ export default function ExamsPage() {
           <button className="btn-primary" onClick={() => setFormOpen(true)}>
             <Plus size={16} /> Create Exam
           </button>
+        )}
+        {user?.role === 'parent' && children.length > 1 && (
+          <select className="input max-w-xs" value={activeChildId} onChange={(e) => setSelectedChild(e.target.value)}>
+            {children.map((c) => (
+              <option key={c._id} value={c._id}>
+                {c.firstName} {c.lastName}
+              </option>
+            ))}
+          </select>
         )}
       </div>
 

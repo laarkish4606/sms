@@ -1,10 +1,26 @@
+import { useState } from 'react';
 import { useGetStudentDashboardQuery } from '../../api/dashboardApi.js';
+import { useGetMyChildrenQuery } from '../../api/parentsApi.js';
+import { useAppSelector } from '../../app/hooks.js';
+import { selectCurrentUser } from '../../features/auth/authSlice.js';
 import Spinner from '../../components/Spinner.jsx';
 import StatCard from '../../components/StatCard.jsx';
+import DashboardHeader from '../../components/DashboardHeader.jsx';
 import { CalendarCheck, Wallet } from 'lucide-react';
 
 export default function StudentDashboard() {
-  const { data, isLoading } = useGetStudentDashboardQuery();
+  const user = useAppSelector(selectCurrentUser);
+  const isParent = user?.role === 'parent';
+
+  const { data: childrenData } = useGetMyChildrenQuery(undefined, { skip: !isParent });
+  const [selectedChild, setSelectedChild] = useState('');
+  const children = childrenData?.data || [];
+  const activeChild = selectedChild || children[0]?._id;
+
+  const { data, isLoading } = useGetStudentDashboardQuery(
+    isParent ? { student: activeChild } : undefined,
+    { skip: isParent && !activeChild }
+  );
 
   if (isLoading) {
     return (
@@ -20,11 +36,26 @@ export default function StudentDashboard() {
   const pct = total ? Math.round((present / total) * 100) : 0;
   const dueInvoices = (stats?.invoices || []).filter((i) => i.status !== 'paid');
 
+  if (isParent && !children.length) {
+    return <p className="text-sm text-gray-500 dark:text-gray-400">No children linked to your account yet.</p>;
+  }
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-        Welcome, {stats?.student?.firstName}
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <DashboardHeader
+          greeting={`Hi ${stats?.student?.firstName || (isParent ? '' : user?.firstName) || ''}, welcome back.`}
+        />
+        {isParent && children.length > 1 && (
+          <select className="input max-w-xs" value={activeChild} onChange={(e) => setSelectedChild(e.target.value)}>
+            {children.map((c) => (
+              <option key={c._id} value={c._id}>
+                {c.firstName} {c.lastName}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <StatCard label="Attendance Rate" value={`${pct}%`} icon={CalendarCheck} accent="green" />

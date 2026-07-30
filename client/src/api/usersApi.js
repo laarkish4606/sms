@@ -37,6 +37,14 @@ export const schoolsApi = baseApi.injectEndpoints({
       query: (id) => ({ url: `/schools/${id}`, method: 'DELETE' }),
       invalidatesTags: [{ type: 'School', id: 'LIST' }],
     }),
+    reactivateSchool: builder.mutation({
+      query: (id) => ({ url: `/schools/${id}/reactivate`, method: 'PATCH' }),
+      invalidatesTags: [{ type: 'School', id: 'LIST' }],
+    }),
+    deleteSchoolPermanently: builder.mutation({
+      query: (id) => ({ url: `/schools/${id}/permanent`, method: 'DELETE' }),
+      invalidatesTags: [{ type: 'School', id: 'LIST' }],
+    }),
   }),
 });
 
@@ -51,5 +59,11 @@ export const {
   useGetDirectoryQuery,
 } = usersApi;
 
-export const { useListSchoolsQuery, useCreateSchoolMutation, useUpdateSchoolMutation, useDeactivateSchoolMutation } =
-  schoolsApi;
+export const {
+  useListSchoolsQuery,
+  useCreateSchoolMutation,
+  useUpdateSchoolMutation,
+  useDeactivateSchoolMutation,
+  useReactivateSchoolMutation,
+  useDeleteSchoolPermanentlyMutation,
+} = schoolsApi;

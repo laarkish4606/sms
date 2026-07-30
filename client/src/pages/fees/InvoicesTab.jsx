@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import { Plus, Wallet, Download } from 'lucide-react';
+import { Plus, Wallet, Download, FileText } from 'lucide-react';
 import DataTable from '../../components/DataTable.jsx';
 import Modal from '../../components/Modal.jsx';
 import Spinner from '../../components/Spinner.jsx';
@@ -10,19 +10,13 @@ import {
   useRecordPaymentMutation,
   useListPaymentsForInvoiceQuery,
   receiptDownloadUrl,
+  invoiceDownloadUrl,
 } from '../../api/feesApi.js';
 import { useListAcademicYearsQuery, useListClassesQuery } from '../../api/academicApi.js';
 import { useAppSelector } from '../../app/hooks.js';
 import { selectCurrentUser } from '../../features/auth/authSlice.js';
 import downloadAuthenticatedFile from '../../utils/downloadFile.js';
-
-const STATUS_COLORS = {
-  pending: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-  partial: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
-  paid: 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400',
-  overdue: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400',
-  cancelled: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500',
-};
+import { INVOICE_STATUS_BADGE } from '../../utils/statusBadges.js';
 
 export default function InvoicesTab() {
   const user = useAppSelector(selectCurrentUser);
@@ -30,9 +24,17 @@ export default function InvoicesTab() {
 
   const [page, setPage] = useState(1);
   const [generateOpen, setGenerateOpen] = useState(false);
-  const [payingInvoice, setPayingInvoice] = useState(null);
+  const [payingInvoiceId, setPayingInvoiceId] = useState(null);
+  const [classFilter, setClassFilter] = useState('');
+  const [yearFilter, setYearFilter] = useState('');
 
-  const { data, isLoading, isError } = useListInvoicesQuery({ page, limit: 10 });
+  const { data, isLoading, isError } = useListInvoicesQuery({
+    page,
+    limit: 10,
+    class: classFilter || undefined,
+    academicYear: yearFilter || undefined,
+  });
+  const payingInvoice = payingInvoiceId ? (data?.data || []).find((inv) => inv._id === payingInvoiceId) : null;
   const { data: yearsData } = useListAcademicYearsQuery({ limit: 100 });
   const { data: classesData } = useListClassesQuery({ limit: 100 });
   const [generateInvoices, { isLoading: generating }] = useGenerateInvoicesMutation();
@@ -45,14 +47,21 @@ export default function InvoicesTab() {
     { key: 'totalAmount', header: 'Total', render: (r) => r.totalAmount.toFixed(2) },
     { key: 'amountPaid', header: 'Paid', render: (r) => r.amountPaid.toFixed(2) },
     { key: 'dueDate', header: 'Due', render: (r) => new Date(r.dueDate).toLocaleDateString() },
-    { key: 'status', header: 'Status', render: (r) => <span className={`badge ${STATUS_COLORS[r.status]}`}>{r.status}</span> },
+    { key: 'status', header: 'Status', render: (r) => <span className={INVOICE_STATUS_BADGE[r.status]}>{r.status}</span> },
     {
       key: 'actions',
       header: '',
       render: (r) => (
         <div className="flex items-center gap-3">
+          <button
+            className="text-gray-400 hover:text-primary-600"
+            title="Download invoice"
+            onClick={() => downloadAuthenticatedFile(invoiceDownloadUrl(r._id), `${r.invoiceNumber}.pdf`)}
+          >
+            <FileText size={16} />
+          </button>
           {canManage && r.status !== 'paid' && r.status !== 'cancelled' && (
-            <button className="text-gray-400 hover:text-primary-600" title="Record payment" onClick={() => setPayingInvoice(r)}>
+            <button className="text-gray-400 hover:text-primary-600" title="Record payment" onClick={() => setPayingInvoiceId(r._id)}>
               <Wallet size={16} />
             </button>
           )}
@@ -63,13 +72,36 @@ export default function InvoicesTab() {
 
   return (
     <div className="space-y-4">
-      {canManage && (
-        <div className="flex justify-end">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-wrap gap-2">
+          <select className="input sm:w-44" value={yearFilter} onChange={(e) => { setYearFilter(e.target.value); setPage(1); }}>
+            <option value="">All years</option>
+            {(yearsData?.data || []).map((y) => (
+              <option key={y._id} value={y._id}>
+                {y.name}
+              </option>
+            ))}
+          </select>
+          <select className="input sm:w-44" value={classFilter} onChange={(e) => { setClassFilter(e.target.value); setPage(1); }}>
+            <option value="">All classes</option>
+            {(classesData?.data || []).map((c) => (
+              <option key={c._id} value={c._id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          {(classFilter || yearFilter) && (
+            <button className="btn-secondary" onClick={() => { setClassFilter(''); setYearFilter(''); setPage(1); }}>
+              Clear filter
+            </button>
+          )}
+        </div>
+        {canManage && (
           <button className="btn-primary" onClick={() => setGenerateOpen(true)}>
             <Plus size={16} /> Generate Invoices
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       <DataTable columns={columns} rows={data?.data || []} isLoading={isLoading} isError={isError} meta={data?.meta} onPageChange={setPage} />
 
@@ -82,6 +114,11 @@ export default function InvoicesTab() {
               const res = await generateInvoices(genValues).unwrap();
               toast.success(res.message);
               setGenerateOpen(false);
+              // Narrow the list to exactly this batch — replaces whatever
+              // class/year filter (or lack of one) was showing before.
+              setClassFilter(genValues.class);
+              setYearFilter(genValues.academicYear);
+              setPage(1);
             } catch (err) {
               toast.error(err?.data?.message || 'Failed to generate invoices');
             }
@@ -132,7 +169,7 @@ export default function InvoicesTab() {
         </form>
       </Modal>
 
-      <PaymentModal invoice={payingInvoice} onClose={() => setPayingInvoice(null)} />
+      <PaymentModal invoice={payingInvoice} onClose={() => setPayingInvoiceId(null)} />
     </div>
   );
 }
@@ -196,12 +233,12 @@ function PaymentModal({ invoice, onClose }) {
           <h3 className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Payment History</h3>
           <ul className="divide-y divide-gray-100 dark:divide-gray-800">
             {paymentsData.data.map((p) => (
-              <li key={p._id} className="flex items-center justify-between py-2 text-sm">
+              <li key={p._id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
                 <span>
                   {new Date(p.paidAt).toLocaleDateString()} — {p.amount.toFixed(2)} ({p.method})
                 </span>
                 <button
-                  className="flex items-center gap-1 text-primary-600 hover:underline"
+                  className="flex shrink-0 items-center gap-1 text-primary-600 hover:underline"
                   onClick={() => downloadAuthenticatedFile(receiptDownloadUrl(p._id), `${p.receiptNumber}.pdf`)}
                 >
                   <Download size={14} /> Receipt

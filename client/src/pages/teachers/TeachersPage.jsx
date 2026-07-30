@@ -13,6 +13,13 @@ import {
 } from '../../api/teachersApi.js';
 import { useAppSelector } from '../../app/hooks.js';
 import { selectCurrentUser } from '../../features/auth/authSlice.js';
+
+const TEACHER_STATUS_BADGE = {
+  active: 'badge-success',
+  on_leave: 'badge-warning',
+  inactive: 'badge-neutral',
+  terminated: 'badge-danger',
+};
 import TeacherForm from './TeacherForm.jsx';
 
 export default function TeachersPage() {
@@ -39,7 +46,7 @@ export default function TeachersPage() {
       {
         key: 'status',
         header: 'Status',
-        render: (row) => <span className="badge bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400">{row.status}</span>,
+        render: (row) => <span className={TEACHER_STATUS_BADGE[row.status] || 'badge-neutral'}>{row.status}</span>,
       },
       ...(canManage
         ? [

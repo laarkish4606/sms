@@ -31,6 +31,11 @@ router.post(
 router.get('/invoices', authorize('school_admin', 'accountant', 'student', 'parent'), controller.listInvoices);
 router.get('/invoices/overdue', authorize('school_admin', 'accountant'), controller.listOverdueInvoices);
 router.get('/invoices/:id', authorize('school_admin', 'accountant', 'student', 'parent'), controller.getInvoice);
+router.get(
+  '/invoices/:id/download',
+  authorize('school_admin', 'accountant', 'student', 'parent'),
+  controller.downloadInvoicePdf
+);
 
 router.post(
   '/invoices/:invoiceId/payments',

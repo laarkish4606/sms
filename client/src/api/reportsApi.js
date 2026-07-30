@@ -12,10 +12,22 @@ export const reportsApi = baseApi.injectEndpoints({
     financialReport: builder.query({
       query: (params) => `/reports/financial${buildQueryString(params)}`,
     }),
+    studentReport: builder.query({
+      query: (params) => `/reports/students${buildQueryString(params)}`,
+    }),
+    outstandingFeeReport: builder.query({
+      query: (params) => `/reports/outstanding-fees${buildQueryString(params)}`,
+    }),
   }),
 });
 
-export const { useAttendanceReportQuery, useAcademicReportQuery, useFinancialReportQuery } = reportsApi;
+export const {
+  useAttendanceReportQuery,
+  useAcademicReportQuery,
+  useFinancialReportQuery,
+  useStudentReportQuery,
+  useOutstandingFeeReportQuery,
+} = reportsApi;
 
 const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
 

@@ -15,5 +15,6 @@ const teacherAttendanceSchema = new mongoose.Schema(
 );
 
 teacherAttendanceSchema.index({ teacher: 1, date: 1 }, { unique: true });
+teacherAttendanceSchema.index({ school: 1, date: 1 });
 
 export default mongoose.model('TeacherAttendance', teacherAttendanceSchema);

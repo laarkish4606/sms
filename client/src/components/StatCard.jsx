@@ -3,13 +3,13 @@ import clsx from 'clsx';
 export default function StatCard({ label, value, icon: Icon, accent = 'primary' }) {
   const accentClasses = {
     primary: 'bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400',
-    green: 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400',
-    amber: 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400',
-    red: 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400',
+    green: 'bg-success-50 text-success-600 dark:bg-success-500/10 dark:text-success-400',
+    amber: 'bg-warning-50 text-warning-600 dark:bg-warning-500/10 dark:text-warning-400',
+    red: 'bg-danger-50 text-danger-600 dark:bg-danger-500/10 dark:text-danger-400',
   };
 
   return (
-    <div className="card flex items-center gap-4 p-5">
+    <div className="card flex items-center gap-4 p-5 transition-shadow hover:shadow-md">
       {Icon && (
         <div className={clsx('flex h-11 w-11 items-center justify-center rounded-xl', accentClasses[accent])}>
           <Icon size={22} />

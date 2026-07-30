@@ -16,5 +16,9 @@ const studentAttendanceSchema = new mongoose.Schema(
 
 studentAttendanceSchema.index({ student: 1, date: 1 }, { unique: true });
 studentAttendanceSchema.index({ section: 1, date: 1 });
+// School-wide "today's attendance" dashboard counts, and the attendance
+// report's class-only (no section) filter path.
+studentAttendanceSchema.index({ school: 1, date: 1 });
+studentAttendanceSchema.index({ school: 1, class: 1, date: 1 });
 
 export default mongoose.model('StudentAttendance', studentAttendanceSchema);

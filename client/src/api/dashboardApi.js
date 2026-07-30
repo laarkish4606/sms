@@ -1,4 +1,5 @@
 import { baseApi } from './baseApi.js';
+import { buildQueryString } from './queryString.js';
 
 export const dashboardApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -9,7 +10,7 @@ export const dashboardApi = baseApi.injectEndpoints({
       query: () => '/dashboard/teacher',
     }),
     getStudentDashboard: builder.query({
-      query: () => '/dashboard/student',
+      query: (params) => `/dashboard/student${buildQueryString(params)}`,
     }),
   }),
 });

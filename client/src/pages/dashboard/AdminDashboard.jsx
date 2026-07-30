@@ -1,12 +1,16 @@
 import { GraduationCap, Users, UserRound, AlertCircle, Wallet } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useGetAdminDashboardQuery } from '../../api/dashboardApi.js';
+import { useAppSelector } from '../../app/hooks.js';
+import { selectCurrentUser } from '../../features/auth/authSlice.js';
 import StatCard from '../../components/StatCard.jsx';
 import Spinner from '../../components/Spinner.jsx';
+import DashboardHeader from '../../components/DashboardHeader.jsx';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export default function AdminDashboard() {
+  const user = useAppSelector(selectCurrentUser);
   const { data, isLoading } = useGetAdminDashboardQuery();
 
   if (isLoading) {
@@ -27,7 +31,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
+      <DashboardHeader greeting={`Hello ${user?.firstName || ''}, here's today's overview.`} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total Students" value={counts.totalStudents ?? 0} icon={GraduationCap} accent="primary" />
@@ -45,7 +49,7 @@ export default function AdminDashboard() {
               <XAxis dataKey="name" fontSize={12} />
               <YAxis fontSize={12} />
               <Tooltip />
-              <Bar dataKey="total" fill="#2563eb" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="total" fill="#4f46e5" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

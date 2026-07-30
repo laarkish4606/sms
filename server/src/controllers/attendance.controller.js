@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import StudentAttendance from '../models/StudentAttendance.model.js';
 import TeacherAttendance from '../models/TeacherAttendance.model.js';
 import Student from '../models/Student.model.js';
@@ -50,7 +51,7 @@ export const listStudentAttendance = asyncHandler(async (req, res) => {
   }
 
   const { data, meta } = await new ApiFeatures(
-    StudentAttendance.find(filter).populate('student', 'firstName lastName admissionNumber').sort('-date'),
+    StudentAttendance.find(filter).populate('student', 'firstName lastName admissionNumber').sort('-date').lean(),
     { ...req.query, ...(filter.student ? { student: filter.student } : {}) },
     []
   )
@@ -66,7 +67,7 @@ export const studentAttendanceReport = asyncHandler(async (req, res) => {
   const { section, from, to } = req.query;
   if (!section) throw ApiError.badRequest('section is required');
 
-  const match = { school: req.schoolId, section };
+  const match = { school: req.schoolId, section: new mongoose.Types.ObjectId(section) };
   if (from || to) {
     match.date = {};
     if (from) match.date.$gte = new Date(from);
@@ -127,7 +128,7 @@ export const markTeacherAttendance = asyncHandler(async (req, res) => {
 export const listTeacherAttendance = asyncHandler(async (req, res) => {
   const filter = { school: req.schoolId };
   const { data, meta } = await new ApiFeatures(
-    TeacherAttendance.find(filter).populate('teacher', 'firstName lastName employeeId').sort('-date'),
+    TeacherAttendance.find(filter).populate('teacher', 'firstName lastName employeeId').sort('-date').lean(),
     req.query,
     []
   )

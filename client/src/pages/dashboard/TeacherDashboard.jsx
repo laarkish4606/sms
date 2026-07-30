@@ -1,6 +1,7 @@
 import { useGetTeacherDashboardQuery } from '../../api/dashboardApi.js';
 import Spinner from '../../components/Spinner.jsx';
 import StatCard from '../../components/StatCard.jsx';
+import DashboardHeader from '../../components/DashboardHeader.jsx';
 import { CalendarCheck, BookOpen } from 'lucide-react';
 
 export default function TeacherDashboard() {
@@ -20,9 +21,7 @@ export default function TeacherDashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-        Welcome, {stats?.teacher?.firstName}
-      </h1>
+      <DashboardHeader greeting={`Hi ${stats?.teacher?.firstName || ''}, here's what's happening today.`} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <StatCard label="Students Present Today" value={present} icon={CalendarCheck} accent="green" />

@@ -1,13 +1,16 @@
+import mongoose from 'mongoose';
 import StudentAttendance from '../models/StudentAttendance.model.js';
 import Invoice from '../models/Invoice.model.js';
 import Payment from '../models/Payment.model.js';
 import Mark from '../models/Mark.model.js';
 import Exam from '../models/Exam.model.js';
+import Student from '../models/Student.model.js';
+import School from '../models/School.model.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/ApiError.js';
 import { sendSuccess } from '../utils/ApiResponse.js';
 import { streamExcel } from '../services/excel.service.js';
-import { streamPdf } from '../services/pdf.service.js';
+import { streamPdf, drawTableReport } from '../services/pdf.service.js';
 import { computeReportCard } from '../services/grading.service.js';
 
 function dateRangeFilter(from, to) {
@@ -20,9 +23,11 @@ function dateRangeFilter(from, to) {
 
 // ---- Attendance report ----
 
-async function buildAttendanceReport(schoolId, { section, from, to }) {
+async function buildAttendanceReport(schoolId, { class: classId, section, student, from, to }) {
   const match = { school: schoolId };
-  if (section) match.section = section;
+  if (section) match.section = new mongoose.Types.ObjectId(section);
+  else if (classId) match.class = new mongoose.Types.ObjectId(classId);
+  if (student) match.student = new mongoose.Types.ObjectId(student);
   const dateRange = dateRangeFilter(from, to);
   if (dateRange) match.date = dateRange;
 
@@ -68,6 +73,40 @@ export const exportAttendanceReportExcel = asyncHandler(async (req, res) => {
       { header: 'Excused', key: 'excused', width: 12 },
     ],
     rows
+  );
+});
+
+export const exportAttendanceReportPdf = asyncHandler(async (req, res) => {
+  const [data, school] = await Promise.all([
+    buildAttendanceReport(req.schoolId, req.query),
+    School.findById(req.schoolId),
+  ]);
+  const rows = data.map((d) => {
+    const statCount = (status) => d.stats.find((s) => s.status === status)?.count || 0;
+    return {
+      admissionNumber: d.student.admissionNumber,
+      name: `${d.student.firstName} ${d.student.lastName}`,
+      present: statCount('present'),
+      absent: statCount('absent'),
+      late: statCount('late'),
+      excused: statCount('excused'),
+    };
+  });
+
+  streamPdf(res, 'attendance-report.pdf', (doc) =>
+    drawTableReport(doc, {
+      school,
+      title: 'Attendance Report',
+      columns: [
+        { header: 'Admission No', key: 'admissionNumber', width: 90 },
+        { header: 'Name', key: 'name', width: 150 },
+        { header: 'Present', key: 'present', width: 70 },
+        { header: 'Absent', key: 'absent', width: 70 },
+        { header: 'Late', key: 'late', width: 70 },
+        { header: 'Excused', key: 'excused', width: 70 },
+      ],
+      rows,
+    })
   );
 });
 
@@ -125,6 +164,37 @@ export const exportAcademicReportExcel = asyncHandler(async (req, res) => {
       { header: 'Result', key: 'result', width: 12 },
     ],
     rows
+  );
+});
+
+export const exportAcademicReportPdf = asyncHandler(async (req, res) => {
+  const [data, school] = await Promise.all([
+    buildAcademicReport(req.schoolId, req.query.exam),
+    School.findById(req.schoolId),
+  ]);
+  const rows = data.map((d) => ({
+    admissionNumber: d.student.admissionNumber,
+    name: `${d.student.firstName} ${d.student.lastName}`,
+    percentage: `${d.percentage}%`,
+    grade: d.grade,
+    gpa: d.gpa,
+    result: d.result,
+  }));
+
+  streamPdf(res, 'academic-report.pdf', (doc) =>
+    drawTableReport(doc, {
+      school,
+      title: 'Academic Performance Report',
+      columns: [
+        { header: 'Admission No', key: 'admissionNumber', width: 90 },
+        { header: 'Name', key: 'name', width: 150 },
+        { header: 'Percentage', key: 'percentage', width: 80 },
+        { header: 'Grade', key: 'grade', width: 60 },
+        { header: 'GPA', key: 'gpa', width: 60 },
+        { header: 'Result', key: 'result', width: 80 },
+      ],
+      rows,
+    })
   );
 });
 
@@ -194,4 +264,172 @@ export const exportFinancialReportPdf = asyncHandler(async (req, res) => {
       );
     });
   });
+});
+
+// ---- Student report ----
+
+async function buildStudentReport(schoolId, { class: classId, section, status }) {
+  const filter = { school: schoolId };
+  if (classId) filter.class = classId;
+  if (section) filter.section = section;
+  if (status) filter.status = status;
+
+  return Student.find(filter)
+    .populate('class', 'name')
+    .populate('section', 'name')
+    .select('firstName lastName admissionNumber class section gender dob status admissionDate')
+    .sort('admissionNumber');
+}
+
+function studentReportRows(students) {
+  return students.map((s) => ({
+    admissionNumber: s.admissionNumber,
+    name: `${s.firstName} ${s.lastName}`,
+    class: s.class?.name || '-',
+    section: s.section?.name || '-',
+    gender: s.gender,
+    status: s.status,
+    admissionDate: s.admissionDate ? new Date(s.admissionDate).toISOString().slice(0, 10) : '-',
+  }));
+}
+
+export const studentReport = asyncHandler(async (req, res) => {
+  const students = await buildStudentReport(req.schoolId, req.query);
+  sendSuccess(res, { data: students });
+});
+
+export const exportStudentReportExcel = asyncHandler(async (req, res) => {
+  const students = await buildStudentReport(req.schoolId, req.query);
+  await streamExcel(
+    res,
+    'student-report.xlsx',
+    'Students',
+    [
+      { header: 'Admission No', key: 'admissionNumber', width: 18 },
+      { header: 'Name', key: 'name', width: 24 },
+      { header: 'Class', key: 'class', width: 14 },
+      { header: 'Section', key: 'section', width: 14 },
+      { header: 'Gender', key: 'gender', width: 10 },
+      { header: 'Status', key: 'status', width: 12 },
+      { header: 'Admission Date', key: 'admissionDate', width: 16 },
+    ],
+    studentReportRows(students)
+  );
+});
+
+export const exportStudentReportPdf = asyncHandler(async (req, res) => {
+  const [students, school] = await Promise.all([
+    buildStudentReport(req.schoolId, req.query),
+    School.findById(req.schoolId),
+  ]);
+
+  streamPdf(res, 'student-report.pdf', (doc) =>
+    drawTableReport(doc, {
+      school,
+      title: 'Student Report',
+      columns: [
+        { header: 'Admission No', key: 'admissionNumber', width: 80 },
+        { header: 'Name', key: 'name', width: 130 },
+        { header: 'Class', key: 'class', width: 70 },
+        { header: 'Section', key: 'section', width: 70 },
+        { header: 'Gender', key: 'gender', width: 60 },
+        { header: 'Status', key: 'status', width: 70 },
+      ],
+      rows: studentReportRows(students),
+    })
+  );
+});
+
+// ---- Outstanding fees report ----
+
+async function buildOutstandingFeeReport(schoolId, { class: classId, section, student }) {
+  const match = { school: schoolId, status: { $in: ['pending', 'partial', 'overdue'] } };
+
+  if (student) {
+    match.student = student;
+  } else if (classId || section) {
+    const studentFilter = { school: schoolId };
+    if (classId) studentFilter.class = classId;
+    if (section) studentFilter.section = section;
+    const students = await Student.find(studentFilter).select('_id');
+    match.student = { $in: students.map((s) => s._id) };
+  }
+
+  const invoices = await Invoice.find(match)
+    .populate({
+      path: 'student',
+      select: 'firstName lastName admissionNumber class section',
+      populate: [{ path: 'class', select: 'name' }, { path: 'section', select: 'name' }],
+    })
+    .sort('dueDate');
+
+  const totalOutstanding = invoices.reduce((sum, inv) => sum + Math.max(inv.totalAmount - inv.amountPaid, 0), 0);
+  return { invoices, totalOutstanding };
+}
+
+function outstandingFeeReportRows(invoices) {
+  return invoices.map((inv) => ({
+    invoiceNumber: inv.invoiceNumber,
+    admissionNumber: inv.student?.admissionNumber || '-',
+    name: inv.student ? `${inv.student.firstName} ${inv.student.lastName}` : '-',
+    class: inv.student?.class?.name || '-',
+    section: inv.student?.section?.name || '-',
+    dueDate: new Date(inv.dueDate).toISOString().slice(0, 10),
+    totalAmount: inv.totalAmount,
+    amountPaid: inv.amountPaid,
+    balance: Math.max(inv.totalAmount - inv.amountPaid, 0),
+    status: inv.status,
+  }));
+}
+
+export const outstandingFeeReport = asyncHandler(async (req, res) => {
+  const { invoices, totalOutstanding } = await buildOutstandingFeeReport(req.schoolId, req.query);
+  sendSuccess(res, { data: { invoices, totalOutstanding } });
+});
+
+export const exportOutstandingFeeReportExcel = asyncHandler(async (req, res) => {
+  const { invoices } = await buildOutstandingFeeReport(req.schoolId, req.query);
+  await streamExcel(
+    res,
+    'outstanding-fees-report.xlsx',
+    'Outstanding Fees',
+    [
+      { header: 'Invoice No', key: 'invoiceNumber', width: 18 },
+      { header: 'Admission No', key: 'admissionNumber', width: 18 },
+      { header: 'Name', key: 'name', width: 24 },
+      { header: 'Class', key: 'class', width: 14 },
+      { header: 'Section', key: 'section', width: 14 },
+      { header: 'Due Date', key: 'dueDate', width: 14 },
+      { header: 'Total', key: 'totalAmount', width: 12 },
+      { header: 'Paid', key: 'amountPaid', width: 12 },
+      { header: 'Balance', key: 'balance', width: 12 },
+      { header: 'Status', key: 'status', width: 12 },
+    ],
+    outstandingFeeReportRows(invoices)
+  );
+});
+
+export const exportOutstandingFeeReportPdf = asyncHandler(async (req, res) => {
+  const [{ invoices, totalOutstanding }, school] = await Promise.all([
+    buildOutstandingFeeReport(req.schoolId, req.query),
+    School.findById(req.schoolId),
+  ]);
+
+  streamPdf(res, 'outstanding-fees-report.pdf', (doc) =>
+    drawTableReport(doc, {
+      school,
+      title: 'Outstanding Fees Report',
+      summaryLines: [`Total Outstanding: ${totalOutstanding.toFixed(2)}`],
+      columns: [
+        { header: 'Invoice No', key: 'invoiceNumber', width: 80 },
+        { header: 'Admission No', key: 'admissionNumber', width: 80 },
+        { header: 'Name', key: 'name', width: 110 },
+        { header: 'Due Date', key: 'dueDate', width: 70 },
+        { header: 'Total', key: 'totalAmount', width: 60 },
+        { header: 'Paid', key: 'amountPaid', width: 60 },
+        { header: 'Balance', key: 'balance', width: 60 },
+      ],
+      rows: outstandingFeeReportRows(invoices),
+    })
+  );
 });

@@ -1,6 +1,32 @@
 import mongoose from 'mongoose';
-import School from '../models/School.model.js';
-import User from '../models/User.model.js';
+import {
+  School,
+  User,
+  AcademicYear,
+  Class,
+  Section,
+  Subject,
+  Timetable,
+  Student,
+  Teacher,
+  Parent,
+  StudentAttendance,
+  TeacherAttendance,
+  Exam,
+  Mark,
+  FeeStructure,
+  Invoice,
+  Payment,
+  Book,
+  BookIssue,
+  TransportRoute,
+  Vehicle,
+  Hostel,
+  Room,
+  Notice,
+  Message,
+  Counter,
+} from '../models/index.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/ApiError.js';
 import { sendSuccess } from '../utils/ApiResponse.js';
@@ -75,4 +101,58 @@ export const deactivateSchool = asyncHandler(async (req, res) => {
   if (!school) throw ApiError.notFound('School not found');
   await User.updateMany({ school: school._id }, { isActive: false });
   sendSuccess(res, { message: 'School deactivated', data: school });
+});
+
+export const reactivateSchool = asyncHandler(async (req, res) => {
+  const school = await School.findByIdAndUpdate(req.params.id, { isActive: true }, { new: true });
+  if (!school) throw ApiError.notFound('School not found');
+  await User.updateMany({ school: school._id }, { isActive: true });
+  sendSuccess(res, { message: 'School reactivated', data: school });
+});
+
+// Permanently removes a school and every record scoped to it. Irreversible —
+// the UI requires typing the school's code back to confirm before calling this.
+export const deleteSchoolPermanently = asyncHandler(async (req, res) => {
+  const school = await School.findById(req.params.id);
+  if (!school) throw ApiError.notFound('School not found');
+
+  const schoolId = school._id;
+
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      await Promise.all([
+        User.deleteMany({ school: schoolId }, { session }),
+        AcademicYear.deleteMany({ school: schoolId }, { session }),
+        Class.deleteMany({ school: schoolId }, { session }),
+        Section.deleteMany({ school: schoolId }, { session }),
+        Subject.deleteMany({ school: schoolId }, { session }),
+        Timetable.deleteMany({ school: schoolId }, { session }),
+        Student.deleteMany({ school: schoolId }, { session }),
+        Teacher.deleteMany({ school: schoolId }, { session }),
+        Parent.deleteMany({ school: schoolId }, { session }),
+        StudentAttendance.deleteMany({ school: schoolId }, { session }),
+        TeacherAttendance.deleteMany({ school: schoolId }, { session }),
+        Exam.deleteMany({ school: schoolId }, { session }),
+        Mark.deleteMany({ school: schoolId }, { session }),
+        FeeStructure.deleteMany({ school: schoolId }, { session }),
+        Invoice.deleteMany({ school: schoolId }, { session }),
+        Payment.deleteMany({ school: schoolId }, { session }),
+        Book.deleteMany({ school: schoolId }, { session }),
+        BookIssue.deleteMany({ school: schoolId }, { session }),
+        TransportRoute.deleteMany({ school: schoolId }, { session }),
+        Vehicle.deleteMany({ school: schoolId }, { session }),
+        Hostel.deleteMany({ school: schoolId }, { session }),
+        Room.deleteMany({ school: schoolId }, { session }),
+        Notice.deleteMany({ school: schoolId }, { session }),
+        Message.deleteMany({ school: schoolId }, { session }),
+        Counter.deleteMany({ key: { $regex: `:${schoolId}$` } }, { session }),
+      ]);
+      await School.deleteOne({ _id: schoolId }, { session });
+    });
+  } finally {
+    session.endSession();
+  }
+
+  sendSuccess(res, { message: 'School permanently deleted' });
 });

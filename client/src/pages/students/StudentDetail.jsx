@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useGetStudentQuery, useUploadStudentPhotoMutation } from '../../api/studentsApi.js';
 import Spinner from '../../components/Spinner.jsx';
 import toast from 'react-hot-toast';
+import compressImage from '../../utils/compressImage.js';
 
 export default function StudentDetail() {
   const { id } = useParams();
@@ -24,7 +25,7 @@ export default function StudentDetail() {
     const file = e.target.files?.[0];
     if (!file) return;
     const formData = new FormData();
-    formData.append('photo', file);
+    formData.append('photo', await compressImage(file));
     try {
       await uploadPhoto({ id, formData }).unwrap();
       toast.success('Photo updated');

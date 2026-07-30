@@ -47,7 +47,7 @@ export const getAdminDashboard = asyncHandler(async (req, res) => {
       },
       { $group: { _id: '$status', count: { $sum: 1 } } },
     ]),
-    Notice.find({ school: schoolId }).sort('-createdAt').limit(5),
+    Notice.find({ school: schoolId }).sort('-createdAt').limit(5).lean(),
     Payment.aggregate([
       { $match: { school: schoolId, paidAt: { $gte: sixMonthsAgo } } },
       {
@@ -95,7 +95,8 @@ export const getTeacherDashboard = asyncHandler(async (req, res) => {
     ]),
     Notice.find({ school: schoolId, $or: [{ audience: 'all' }, { audience: 'teachers' }] })
       .sort('-createdAt')
-      .limit(5),
+      .limit(5)
+      .lean(),
   ]);
 
   sendSuccess(res, {
@@ -109,17 +110,28 @@ export const getTeacherDashboard = asyncHandler(async (req, res) => {
 
 export const getStudentDashboard = asyncHandler(async (req, res) => {
   const schoolId = req.schoolId;
-  const student = await Student.findOne({ user: req.user._id }).populate('class section');
+
+  let student;
+  if (req.user.role === 'parent') {
+    const parent = await Parent.findOne({ user: req.user._id }).populate({ path: 'children', populate: ['class', 'section'] });
+    const children = parent?.children || [];
+    student = req.query.student ? children.find((c) => c._id.toString() === req.query.student) : children[0];
+  } else {
+    student = await Student.findOne({ user: req.user._id }).populate('class section');
+  }
 
   const [attendanceSummary, invoices, recentNotices] = await Promise.all([
-    StudentAttendance.aggregate([
-      { $match: { school: schoolId, student: student?._id } },
-      { $group: { _id: '$status', count: { $sum: 1 } } },
-    ]),
-    Invoice.find({ school: schoolId, student: student?._id }).sort('-dueDate').limit(5),
+    student
+      ? StudentAttendance.aggregate([
+          { $match: { school: schoolId, student: student._id } },
+          { $group: { _id: '$status', count: { $sum: 1 } } },
+        ])
+      : [],
+    student ? Invoice.find({ school: schoolId, student: student._id }).sort('-dueDate').limit(5).lean() : [],
     Notice.find({ school: schoolId, $or: [{ audience: 'all' }, { audience: 'students' }] })
       .sort('-createdAt')
-      .limit(5),
+      .limit(5)
+      .lean(),
   ]);
 
   sendSuccess(res, { data: { student, attendanceSummary, invoices, recentNotices } });

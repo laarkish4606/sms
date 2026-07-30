@@ -14,5 +14,9 @@ const messageSchema = new mongoose.Schema(
 );
 
 messageSchema.index({ sender: 1, recipient: 1, createdAt: -1 });
+// Inbox/sent views filter by just one side (recipient or sender) sorted by
+// date — the compound index above can't serve those efficiently on its own.
+messageSchema.index({ recipient: 1, createdAt: -1 });
+messageSchema.index({ sender: 1, createdAt: -1 });
 
 export default mongoose.model('Message', messageSchema);

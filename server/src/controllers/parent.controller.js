@@ -55,7 +55,13 @@ export const createParent = asyncHandler(async (req, res) => {
 
 export const listParents = asyncHandler(async (req, res) => {
   const filter = { school: req.schoolId };
-  const { data, meta } = await new ApiFeatures(Parent.find(filter).populate(POPULATE_CHILDREN), req.query, [])
+  const { data, meta } = await new ApiFeatures(
+    Parent.find(filter)
+      .populate(POPULATE_CHILDREN)
+      .populate({ path: 'user', select: 'firstName lastName email phone avatar isActive' }),
+    req.query,
+    []
+  )
     .filter()
     .sort()
     .paginate()
@@ -83,15 +89,34 @@ export const getMyChildren = asyncHandler(async (req, res) => {
 });
 
 export const updateParent = asyncHandler(async (req, res) => {
-  const disallowed = ['user', 'school', 'children'];
-  disallowed.forEach((key) => delete req.body[key]);
+  const { firstName, lastName, phone, occupation, address } = req.body;
 
-  const parent = await Parent.findOneAndUpdate({ _id: req.params.id, school: req.schoolId }, req.body, {
-    new: true,
-    runValidators: true,
-  }).populate(POPULATE_CHILDREN);
+  const parent = await Parent.findOne({ _id: req.params.id, school: req.schoolId });
   if (!parent) throw ApiError.notFound('Parent not found');
-  sendSuccess(res, { message: 'Parent updated', data: parent });
+
+  const userUpdate = {};
+  if (firstName !== undefined) userUpdate.firstName = firstName;
+  if (lastName !== undefined) userUpdate.lastName = lastName;
+  if (phone !== undefined) userUpdate.phone = phone;
+
+  const parentUpdate = {};
+  if (occupation !== undefined) parentUpdate.occupation = occupation;
+  if (address !== undefined) parentUpdate.address = address;
+
+  const tasks = [];
+  if (Object.keys(userUpdate).length) {
+    tasks.push(User.findByIdAndUpdate(parent.user, userUpdate, { runValidators: true }));
+  }
+  if (Object.keys(parentUpdate).length) {
+    tasks.push(Parent.updateOne({ _id: parent._id }, parentUpdate, { runValidators: true }));
+  }
+  await Promise.all(tasks);
+
+  const updated = await Parent.findById(parent._id)
+    .populate(POPULATE_CHILDREN)
+    .populate({ path: 'user', select: 'firstName lastName email phone avatar isActive' });
+
+  sendSuccess(res, { message: 'Parent updated', data: updated });
 });
 
 export const linkChild = asyncHandler(async (req, res) => {

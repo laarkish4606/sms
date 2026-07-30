@@ -35,7 +35,7 @@ export default function StaffPage() {
         key: 'isActive',
         header: 'Status',
         render: (r) => (
-          <span className={`badge ${r.isActive ? 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
+          <span className={r.isActive ? 'badge-success' : 'badge-neutral'}>
             {r.isActive ? 'Active' : 'Inactive'}
           </span>
         ),

@@ -4,14 +4,7 @@ import { selectCurrentUser } from '../../features/auth/authSlice.js';
 import { useGetMyChildrenQuery, useGetChildAttendanceQuery } from '../../api/parentsApi.js';
 import { useListStudentAttendanceQuery } from '../../api/attendanceApi.js';
 import Spinner from '../../components/Spinner.jsx';
-
-const STATUS_COLORS = {
-  present: 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400',
-  absent: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400',
-  late: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
-  half_day: 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400',
-  excused: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
-};
+import { ATTENDANCE_STATUS_BADGE } from '../../utils/statusBadges.js';
 
 export default function MyAttendance() {
   const user = useAppSelector(selectCurrentUser);
@@ -54,7 +47,7 @@ export default function MyAttendance() {
             {records.map((r) => (
               <div key={r._id} className="flex items-center justify-between py-2.5">
                 <span className="text-sm text-gray-700 dark:text-gray-300">{new Date(r.date).toLocaleDateString()}</span>
-                <span className={`badge ${STATUS_COLORS[r.status]}`}>{r.status.replace('_', ' ')}</span>
+                <span className={ATTENDANCE_STATUS_BADGE[r.status]}>{r.status.replace('_', ' ')}</span>
               </div>
             ))}
           </div>

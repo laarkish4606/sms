@@ -16,4 +16,7 @@ router
   .patch(schoolController.updateSchool)
   .delete(schoolController.deactivateSchool);
 
+router.patch('/:id/reactivate', schoolController.reactivateSchool);
+router.delete('/:id/permanent', schoolController.deleteSchoolPermanently);
+
 export default router;

@@ -8,7 +8,19 @@ export default function ParentForm({ initialValues, onSubmit, isSubmitting }) {
   const isEdit = Boolean(initialValues);
 
   useEffect(() => {
-    setValues(initialValues ? { ...EMPTY_FORM, ...initialValues } : EMPTY_FORM);
+    if (!initialValues) {
+      setValues(EMPTY_FORM);
+      return;
+    }
+    setValues({
+      ...EMPTY_FORM,
+      firstName: initialValues.user?.firstName || '',
+      lastName: initialValues.user?.lastName || '',
+      email: initialValues.user?.email || '',
+      phone: initialValues.user?.phone || '',
+      occupation: initialValues.occupation || '',
+      address: initialValues.address || '',
+    });
   }, [initialValues]);
 
   const handleChange = (field) => (e) => setValues((v) => ({ ...v, [field]: e.target.value }));

@@ -15,7 +15,11 @@ const academicHistorySchema = new mongoose.Schema(
     academicYear: { type: mongoose.Schema.Types.ObjectId, ref: 'AcademicYear' },
     class: { type: mongoose.Schema.Types.ObjectId, ref: 'Class' },
     section: { type: mongoose.Schema.Types.ObjectId, ref: 'Section' },
-    result: { type: String, enum: ['PASS', 'FAIL', 'PROMOTED', 'RETAINED', 'ONGOING'], default: 'ONGOING' },
+    result: {
+      type: String,
+      enum: ['PASS', 'FAIL', 'PROMOTED', 'RETAINED', 'ONGOING', 'TRANSFERRED', 'GRADUATED', 'WITHDRAWN'],
+      default: 'ONGOING',
+    },
     remarks: { type: String, trim: true },
   },
   { _id: false }
@@ -30,7 +34,10 @@ const studentSchema = new mongoose.Schema(
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
     email: { type: String, required: true, trim: true, lowercase: true },
-    admissionNumber: { type: String, required: true, unique: true },
+    // Admission numbers are only guaranteed unique within a school (see the
+    // compound index below) — the generator scopes its counter per school,
+    // so two different schools' students can legitimately share a number.
+    admissionNumber: { type: String, required: true },
     admissionDate: { type: Date, default: Date.now },
 
     class: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', required: true, index: true },
@@ -52,6 +59,10 @@ const studentSchema = new mongoose.Schema(
     emergencyContact: { name: String, phone: String },
 
     academicHistory: [academicHistorySchema],
+    // The academic year a student was last processed OUT of by the promotion
+    // workflow — guards against re-promoting the same student twice for the
+    // same fromAcademicYear -> toAcademicYear run.
+    lastPromotedAcademicYear: { type: mongoose.Schema.Types.ObjectId, ref: 'AcademicYear' },
 
     transport: {
       route: { type: mongoose.Schema.Types.ObjectId, ref: 'TransportRoute' },
@@ -67,7 +78,9 @@ const studentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+studentSchema.index({ school: 1, admissionNumber: 1 }, { unique: true });
 studentSchema.index({ school: 1, class: 1, section: 1 });
+studentSchema.index({ school: 1, status: 1 });
 studentSchema.index({ firstName: 'text', lastName: 'text', admissionNumber: 'text' });
 
 studentSchema.virtual('profile', {
