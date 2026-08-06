@@ -55,6 +55,7 @@ export async function buildImportTemplate() {
 
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 const GENDERS = ['male', 'female', 'other'];
+const MIN_ENROLLMENT_AGE = 3;
 
 function cellText(cell) {
   if (cell === null || cell === undefined) return '';
@@ -111,7 +112,13 @@ export async function parseAndValidateImport(buffer, { schoolId, academicYearId 
 
     if (!data.firstName) errors.push('First name is required');
     if (!data.lastName) errors.push('Last name is required');
-    if (!data.dob || Number.isNaN(Date.parse(data.dob))) errors.push('Valid date of birth is required (YYYY-MM-DD)');
+    if (!data.dob || Number.isNaN(Date.parse(data.dob))) {
+      errors.push('Valid date of birth is required (YYYY-MM-DD)');
+    } else {
+      const cutoff = new Date();
+      cutoff.setFullYear(cutoff.getFullYear() - MIN_ENROLLMENT_AGE);
+      if (new Date(data.dob) > cutoff) errors.push(`Student must be at least ${MIN_ENROLLMENT_AGE} years old to be enrolled`);
+    }
 
     const gender = (data.gender || '').toLowerCase();
     if (!GENDERS.includes(gender)) errors.push('Gender must be male, female, or other');

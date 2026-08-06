@@ -27,6 +27,10 @@ export const feesApi = baseApi.injectEndpoints({
       query: (body) => ({ url: '/fees/invoices/generate', method: 'POST', body }),
       invalidatesTags: [{ type: 'Invoice', id: 'LIST' }],
     }),
+    generateMonthlyInvoices: builder.mutation({
+      query: (body) => ({ url: '/fees/invoices/generate-monthly', method: 'POST', body }),
+      invalidatesTags: [{ type: 'Invoice', id: 'LIST' }],
+    }),
     listInvoices: builder.query({
       query: (params) => `/fees/invoices${buildQueryString(params)}`,
       providesTags: (result) =>
@@ -64,6 +68,7 @@ export const {
   useUpdateFeeStructureMutation,
   useDeleteFeeStructureMutation,
   useGenerateInvoicesMutation,
+  useGenerateMonthlyInvoicesMutation,
   useListInvoicesQuery,
   useListOverdueInvoicesQuery,
   useGetInvoiceQuery,

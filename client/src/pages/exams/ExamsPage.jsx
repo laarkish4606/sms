@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Plus, CheckCircle2 } from 'lucide-react';
+import { Plus, CheckCircle2, Send, Trophy } from 'lucide-react';
 import DataTable from '../../components/DataTable.jsx';
 import Modal from '../../components/Modal.jsx';
-import { useListExamsQuery, useCreateExamMutation, usePublishExamMutation } from '../../api/examsApi.js';
+import { useListExamsQuery, useCreateExamMutation, useSubmitExamMutation, usePublishExamMutation } from '../../api/examsApi.js';
 import { useListAcademicYearsQuery, useListClassesQuery, useListSubjectsQuery } from '../../api/academicApi.js';
 import { useGetMyStudentProfileQuery } from '../../api/studentsApi.js';
 import { useGetMyChildrenQuery } from '../../api/parentsApi.js';
@@ -22,7 +22,9 @@ export default function ExamsPage() {
   const { data: classesData } = useListClassesQuery({ limit: 100 });
   const { data: subjectsData } = useListSubjectsQuery({ limit: 100 });
   const [createExam, { isLoading: creating }] = useCreateExamMutation();
+  const [submitExam] = useSubmitExamMutation();
   const [publishExam] = usePublishExamMutation();
+  const canTeach = user?.role === 'school_admin' || user?.role === 'teacher';
 
   const { data: myProfile } = useGetMyStudentProfileQuery(undefined, { skip: user?.role !== 'student' });
   const { data: myChildren } = useGetMyChildrenQuery(undefined, { skip: user?.role !== 'parent' });
@@ -36,12 +38,14 @@ export default function ExamsPage() {
     { key: 'name', header: 'Exam' },
     { key: 'class', header: 'Class', render: (r) => r.class?.name },
     { key: 'academicYear', header: 'Academic Year', render: (r) => r.academicYear?.name },
+    { key: 'category', header: 'Category', render: (r) => <span className="capitalize">{r.category || 'final'}</span> },
+    { key: 'weight', header: 'Weight', render: (r) => `${r.weight ?? 100}%` },
     {
       key: 'status',
       header: 'Status',
       render: (r) => (
-        <span className={r.isPublished ? 'badge-success' : 'badge-neutral'}>
-          {r.isPublished ? 'Published' : 'Draft'}
+        <span className={r.status === 'approved' ? 'badge-success' : r.status === 'submitted' ? 'badge-warning' : 'badge-neutral'}>
+          {r.status ? r.status.charAt(0).toUpperCase() + r.status.slice(1) : 'Draft'}
         </span>
       ),
     },
@@ -50,20 +54,36 @@ export default function ExamsPage() {
       header: '',
       render: (r) => (
         <div className="flex items-center gap-3 text-sm">
-          {(user?.role === 'school_admin' || user?.role === 'teacher') && (
+          {canTeach && (
             <Link to={`/exams/${r._id}/marks`} className="text-primary-600 hover:underline">
               Enter marks
             </Link>
           )}
-          {(user?.role === 'school_admin' || user?.role === 'teacher') && (
+          {canTeach && (
             <Link to={`/exams/${r._id}/results`} className="text-primary-600 hover:underline">
               Results
             </Link>
           )}
-          {canManage && !r.isPublished && (
+          {canTeach && (!r.status || r.status === 'draft') && (
+            <button
+              className="flex items-center gap-1 text-gray-400 hover:text-warning-600"
+              title="Submit for approval"
+              onClick={async () => {
+                try {
+                  await submitExam(r._id).unwrap();
+                  toast.success('Submitted for approval');
+                } catch (err) {
+                  toast.error(err?.data?.message || 'Failed to submit');
+                }
+              }}
+            >
+              <Send size={16} />
+            </button>
+          )}
+          {canManage && r.status !== 'approved' && (
             <button
               className="flex items-center gap-1 text-gray-400 hover:text-green-600"
-              title="Publish results"
+              title="Approve & publish results"
               onClick={async () => {
                 await publishExam(r._id).unwrap();
                 toast.success('Results published');
@@ -86,11 +106,18 @@ export default function ExamsPage() {
     <div className="space-y-4">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Examinations</h1>
-        {canManage && (
-          <button className="btn-primary" onClick={() => setFormOpen(true)}>
-            <Plus size={16} /> Create Exam
-          </button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {canTeach && (
+            <Link to="/exams/ranking" className="btn-secondary">
+              <Trophy size={16} /> Class Ranking
+            </Link>
+          )}
+          {canManage && (
+            <button className="btn-primary" onClick={() => setFormOpen(true)}>
+              <Plus size={16} /> Create Exam
+            </button>
+          )}
+        </div>
         {user?.role === 'parent' && children.length > 1 && (
           <select className="input max-w-xs" value={activeChildId} onChange={(e) => setSelectedChild(e.target.value)}>
             {children.map((c) => (

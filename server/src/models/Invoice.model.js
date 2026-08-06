@@ -19,6 +19,10 @@ const invoiceSchema = new mongoose.Schema(
     amountPaid: { type: Number, default: 0 },
     dueDate: { type: Date, required: true },
     status: { type: String, enum: ['pending', 'partial', 'paid', 'overdue', 'cancelled'], default: 'pending' },
+    // Set only for recurring monthly fees, formatted "YYYY-MM" — the partial
+    // unique index below stops the same student from getting two invoices
+    // for the same month, while leaving one-time invoices unaffected.
+    billingPeriod: { type: String },
   },
   { timestamps: true }
 );
@@ -42,5 +46,9 @@ invoiceSchema.index({ school: 1, student: 1, academicYear: 1 });
 // Covers dashboard counts, overdue sweeps, and outstanding-fee reports,
 // which all filter by status (often plus a dueDate range) within a school.
 invoiceSchema.index({ school: 1, status: 1, dueDate: 1 });
+invoiceSchema.index(
+  { student: 1, billingPeriod: 1 },
+  { unique: true, partialFilterExpression: { billingPeriod: { $exists: true } } }
+);
 
 export default mongoose.model('Invoice', invoiceSchema);

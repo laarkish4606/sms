@@ -28,21 +28,33 @@ export const deleteFeeStructure = feeStructureBase.deleteOne;
 
 // ---- Invoices ----
 
-// Generates one invoice per active student in a class, based on that class's fee structure.
+// Generates one invoice per active student in a class, based on that class's
+// fee structure — covers only the one-time/annual/term/quarterly items;
+// items billed 'monthly' are handled separately by generateMonthlyInvoices
+// so they aren't charged twice.
 export const generateInvoicesForClass = asyncHandler(async (req, res) => {
   const { class: classId, academicYear, dueDate } = req.body;
 
   const structure = await FeeStructure.findOne({ class: classId, academicYear, school: req.schoolId });
   if (!structure) throw ApiError.notFound('No fee structure defined for this class/academic year');
 
+  const items = structure.items.filter((i) => i.frequency !== 'monthly').map((i) => ({ name: i.name, amount: i.amount }));
+  if (!items.length) {
+    throw ApiError.badRequest('This fee structure only has monthly-billed items — use "Generate Monthly Fees" instead');
+  }
+  const totalAmount = items.reduce((sum, i) => sum + i.amount, 0);
+
   const students = await Student.find({ class: classId, school: req.schoolId, status: 'active' });
   if (!students.length) throw ApiError.badRequest('No active students found in this class');
 
-  const items = structure.items.map((i) => ({ name: i.name, amount: i.amount }));
-
   const invoices = [];
   for (const student of students) {
-    const exists = await Invoice.findOne({ student: student._id, academicYear, school: req.schoolId });
+    const exists = await Invoice.findOne({
+      student: student._id,
+      academicYear,
+      school: req.schoolId,
+      billingPeriod: { $exists: false },
+    });
     if (exists) continue;
 
     const invoiceNumber = await generateInvoiceNumber(req.schoolId);
@@ -52,7 +64,7 @@ export const generateInvoicesForClass = asyncHandler(async (req, res) => {
       academicYear,
       invoiceNumber,
       items,
-      totalAmount: structure.totalAmount,
+      totalAmount,
       dueDate,
     });
   }
@@ -61,6 +73,52 @@ export const generateInvoicesForClass = asyncHandler(async (req, res) => {
   sendSuccess(res, {
     statusCode: 201,
     message: `${created.length} invoice(s) generated (${students.length - created.length} already existed)`,
+    data: created,
+  });
+});
+
+// Generates one invoice per active student in a class for a single calendar
+// month, covering only the fee structure's 'monthly' items. Safe to call
+// again for the same month — students who already have an invoice for that
+// billingPeriod are skipped rather than double-billed.
+export const generateMonthlyInvoices = asyncHandler(async (req, res) => {
+  const { class: classId, academicYear, month, dueDate } = req.body;
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month || '')) {
+    throw ApiError.badRequest('month must be in YYYY-MM format');
+  }
+
+  const structure = await FeeStructure.findOne({ class: classId, academicYear, school: req.schoolId });
+  if (!structure) throw ApiError.notFound('No fee structure defined for this class/academic year');
+
+  const items = structure.items.filter((i) => i.frequency === 'monthly').map((i) => ({ name: i.name, amount: i.amount }));
+  if (!items.length) throw ApiError.badRequest('This fee structure has no monthly-billed items');
+  const totalAmount = items.reduce((sum, i) => sum + i.amount, 0);
+
+  const students = await Student.find({ class: classId, school: req.schoolId, status: 'active' });
+  if (!students.length) throw ApiError.badRequest('No active students found in this class');
+
+  const invoices = [];
+  for (const student of students) {
+    const exists = await Invoice.findOne({ student: student._id, billingPeriod: month, school: req.schoolId });
+    if (exists) continue;
+
+    const invoiceNumber = await generateInvoiceNumber(req.schoolId);
+    invoices.push({
+      school: req.schoolId,
+      student: student._id,
+      academicYear,
+      invoiceNumber,
+      items,
+      totalAmount,
+      dueDate,
+      billingPeriod: month,
+    });
+  }
+
+  const created = invoices.length ? await Invoice.insertMany(invoices) : [];
+  sendSuccess(res, {
+    statusCode: 201,
+    message: `${created.length} invoice(s) generated for ${month} (${students.length - created.length} already existed)`,
     data: created,
   });
 });

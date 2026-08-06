@@ -19,6 +19,19 @@ const examSchema = new mongoose.Schema(
     subjects: [examSubjectSchema],
     startDate: { type: Date },
     endDate: { type: Date },
+    // Which assessment category this counts as, and how much it contributes
+    // to a subject's overall term grade (see grading.service.js) — several
+    // exams of different categories/weights are combined per subject per term.
+    category: {
+      type: String,
+      enum: ['assignment', 'quiz', 'midterm', 'final', 'practical', 'other'],
+      default: 'final',
+    },
+    weight: { type: Number, min: 0, max: 100, default: 100 },
+    // Teacher enters marks (draft) -> submits for review (submitted) ->
+    // admin approves (approved, which also publishes results to students).
+    status: { type: String, enum: ['draft', 'submitted', 'approved'], default: 'draft' },
+    submittedAt: { type: Date },
     isPublished: { type: Boolean, default: false },
     publishedAt: { type: Date },
   },

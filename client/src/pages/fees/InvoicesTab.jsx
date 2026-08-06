@@ -7,6 +7,7 @@ import Spinner from '../../components/Spinner.jsx';
 import {
   useListInvoicesQuery,
   useGenerateInvoicesMutation,
+  useGenerateMonthlyInvoicesMutation,
   useRecordPaymentMutation,
   useListPaymentsForInvoiceQuery,
   receiptDownloadUrl,
@@ -24,26 +25,32 @@ export default function InvoicesTab() {
 
   const [page, setPage] = useState(1);
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [generateMonthlyOpen, setGenerateMonthlyOpen] = useState(false);
   const [payingInvoiceId, setPayingInvoiceId] = useState(null);
   const [classFilter, setClassFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
+  const [monthFilter, setMonthFilter] = useState('');
 
   const { data, isLoading, isError } = useListInvoicesQuery({
     page,
     limit: 10,
     class: classFilter || undefined,
     academicYear: yearFilter || undefined,
+    billingPeriod: monthFilter || undefined,
   });
   const payingInvoice = payingInvoiceId ? (data?.data || []).find((inv) => inv._id === payingInvoiceId) : null;
   const { data: yearsData } = useListAcademicYearsQuery({ limit: 100 });
   const { data: classesData } = useListClassesQuery({ limit: 100 });
   const [generateInvoices, { isLoading: generating }] = useGenerateInvoicesMutation();
+  const [generateMonthlyInvoices, { isLoading: generatingMonthly }] = useGenerateMonthlyInvoicesMutation();
 
   const [genValues, setGenValues] = useState({ class: '', academicYear: '', dueDate: '' });
+  const [genMonthlyValues, setGenMonthlyValues] = useState({ class: '', academicYear: '', month: '', dueDate: '' });
 
   const columns = [
     { key: 'invoiceNumber', header: 'Invoice No' },
     { key: 'student', header: 'Student', render: (r) => `${r.student?.firstName} ${r.student?.lastName}` },
+    { key: 'month', header: 'Month', render: (r) => r.billingPeriod || '-' },
     { key: 'totalAmount', header: 'Total', render: (r) => r.totalAmount.toFixed(2) },
     { key: 'amountPaid', header: 'Paid', render: (r) => r.amountPaid.toFixed(2) },
     { key: 'dueDate', header: 'Due', render: (r) => new Date(r.dueDate).toLocaleDateString() },
@@ -90,16 +97,27 @@ export default function InvoicesTab() {
               </option>
             ))}
           </select>
-          {(classFilter || yearFilter) && (
-            <button className="btn-secondary" onClick={() => { setClassFilter(''); setYearFilter(''); setPage(1); }}>
+          <input
+            type="month"
+            className="input sm:w-40"
+            value={monthFilter}
+            onChange={(e) => { setMonthFilter(e.target.value); setPage(1); }}
+          />
+          {(classFilter || yearFilter || monthFilter) && (
+            <button className="btn-secondary" onClick={() => { setClassFilter(''); setYearFilter(''); setMonthFilter(''); setPage(1); }}>
               Clear filter
             </button>
           )}
         </div>
         {canManage && (
-          <button className="btn-primary" onClick={() => setGenerateOpen(true)}>
-            <Plus size={16} /> Generate Invoices
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-secondary" onClick={() => setGenerateMonthlyOpen(true)}>
+              <Plus size={16} /> Generate Monthly Fees
+            </button>
+            <button className="btn-primary" onClick={() => setGenerateOpen(true)}>
+              <Plus size={16} /> Generate Invoices
+            </button>
+          </div>
         )}
       </div>
 
@@ -164,6 +182,88 @@ export default function InvoicesTab() {
           <div className="flex justify-end pt-2">
             <button type="submit" className="btn-primary" disabled={generating}>
               {generating ? <Spinner size={16} className="text-white" /> : 'Generate'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal open={generateMonthlyOpen} onClose={() => setGenerateMonthlyOpen(false)} title="Generate Monthly Fees">
+        <form
+          className="space-y-4"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            try {
+              const res = await generateMonthlyInvoices(genMonthlyValues).unwrap();
+              toast.success(res.message);
+              setGenerateMonthlyOpen(false);
+              setClassFilter(genMonthlyValues.class);
+              setYearFilter(genMonthlyValues.academicYear);
+              setMonthFilter(genMonthlyValues.month);
+              setPage(1);
+            } catch (err) {
+              toast.error(err?.data?.message || 'Failed to generate monthly fees');
+            }
+          }}
+        >
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Only fee items marked with a <strong>monthly</strong> frequency in the class's fee structure are billed. Safe
+            to run again for the same month — students already billed are skipped.
+          </p>
+          <div>
+            <label className="label">Class</label>
+            <select
+              className="input"
+              required
+              value={genMonthlyValues.class}
+              onChange={(e) => setGenMonthlyValues((v) => ({ ...v, class: e.target.value }))}
+            >
+              <option value="">Select...</option>
+              {(classesData?.data || []).map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Academic Year</label>
+            <select
+              className="input"
+              required
+              value={genMonthlyValues.academicYear}
+              onChange={(e) => setGenMonthlyValues((v) => ({ ...v, academicYear: e.target.value }))}
+            >
+              <option value="">Select...</option>
+              {(yearsData?.data || []).map((y) => (
+                <option key={y._id} value={y._id}>
+                  {y.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label">Month</label>
+            <input
+              type="month"
+              className="input"
+              required
+              value={genMonthlyValues.month}
+              onChange={(e) => setGenMonthlyValues((v) => ({ ...v, month: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="label">Due date</label>
+            <input
+              type="date"
+              className="input"
+              required
+              value={genMonthlyValues.dueDate}
+              onChange={(e) => setGenMonthlyValues((v) => ({ ...v, dueDate: e.target.value }))}
+            />
+          </div>
+          <div className="flex justify-end pt-2">
+            <button type="submit" className="btn-primary" disabled={generatingMonthly}>
+              {generatingMonthly ? <Spinner size={16} className="text-white" /> : 'Generate'}
             </button>
           </div>
         </form>

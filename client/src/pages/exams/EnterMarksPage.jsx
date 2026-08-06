@@ -53,6 +53,15 @@ export default function EnterMarksPage() {
         <ArrowLeft size={16} /> Back to exams
       </Link>
       <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{exam.name} — Enter Marks</h1>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="badge-info capitalize">{exam.category || 'final'}</span>
+        <span className="badge-neutral">Weight: {exam.weight ?? 100}%</span>
+        {exam.status === 'approved' && (
+          <span className="alert-warning !inline-flex !w-auto !py-1">
+            Results are already approved — new marks won't be visible to students until re-approved.
+          </span>
+        )}
+      </div>
 
       <div className="card p-4">
         <label className="label">Subject</label>

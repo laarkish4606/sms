@@ -7,7 +7,7 @@ import ApiError from '../utils/ApiError.js';
 import { sendSuccess } from '../utils/ApiResponse.js';
 import ApiFeatures from '../utils/apiFeatures.js';
 import crudFactory from '../utils/crudFactory.js';
-import { computeReportCard } from '../services/grading.service.js';
+import { computeReportCard, computeTermReportCard, rankByPercentage } from '../services/grading.service.js';
 
 const POPULATE = [
   { path: 'class', select: 'name' },
@@ -21,12 +21,38 @@ export const createExam = base.createOne;
 export const listExams = base.getAll;
 export const getExam = base.getOne;
 export const updateExam = base.updateOne;
-export const deleteExam = base.deleteOne;
 
+// Deleting an exam must also clear out its marks — otherwise Mark documents
+// are left pointing at a nonexistent exam, which then shows up as a blank
+// "(unknown exam)" entry anywhere marks are surfaced (report cards, recent
+// grades on dashboards, term reports).
+export const deleteExam = asyncHandler(async (req, res) => {
+  const exam = await Exam.findOneAndDelete({ _id: req.params.id, school: req.schoolId });
+  if (!exam) throw ApiError.notFound('Exam not found');
+  await Mark.deleteMany({ exam: exam._id });
+  sendSuccess(res, { message: 'Exam deleted' });
+});
+
+// Teacher-side step of the grading workflow: marks the exam ready for admin
+// review. Only meaningful from 'draft' — an already submitted/approved exam
+// should go through re-approval rather than silently resetting.
+export const submitExam = asyncHandler(async (req, res) => {
+  const exam = await Exam.findOneAndUpdate(
+    { _id: req.params.id, school: req.schoolId, status: 'draft' },
+    { status: 'submitted', submittedAt: new Date() },
+    { new: true }
+  );
+  if (!exam) throw ApiError.notFound('Exam not found, or it has already been submitted/approved');
+  sendSuccess(res, { message: 'Submitted for approval', data: exam });
+});
+
+// Admin-side approval — publishes results to students/parents. Admins can
+// approve directly even skipping a formal submission, since they already
+// have full authority over the exam.
 export const publishExam = asyncHandler(async (req, res) => {
   const exam = await Exam.findOneAndUpdate(
     { _id: req.params.id, school: req.schoolId },
-    { isPublished: true, publishedAt: new Date() },
+    { isPublished: true, publishedAt: new Date(), status: 'approved' },
     { new: true }
   );
   if (!exam) throw ApiError.notFound('Exam not found');
@@ -143,4 +169,95 @@ export const getClassResultsSummary = asyncHandler(async (req, res) => {
   });
 
   sendSuccess(res, { data: results });
+});
+
+// ---- Term-level grading: combines every approved exam (assignment, quiz,
+// midterm, final, practical, ...) in a class/academic year per subject,
+// weighted by each exam's configured weight. ----
+
+async function loadApprovedExams(schoolId, academicYear, classId) {
+  const exams = await Exam.find({ school: schoolId, academicYear, class: classId, status: 'approved' });
+  return { exams, examById: new Map(exams.map((e) => [e._id.toString(), e])) };
+}
+
+function marksToSubjectEntries(marks, examById) {
+  const bySubject = new Map();
+  marks.forEach((m) => {
+    const key = m.subject._id.toString();
+    if (!bySubject.has(key)) bySubject.set(key, { subject: m.subject.name, entries: [] });
+    const exam = examById.get(m.exam.toString());
+    bySubject.get(key).entries.push({
+      obtained: m.obtainedMarks,
+      total: m.maxMarks,
+      weight: exam?.weight,
+      category: exam?.category,
+    });
+  });
+  return bySubject;
+}
+
+export const getTermReportCard = asyncHandler(async (req, res) => {
+  const { academicYear, class: classId, student: studentId } = req.query;
+  if (!academicYear || !classId || !studentId) {
+    throw ApiError.badRequest('academicYear, class, and student are required');
+  }
+  await assertCanViewStudentReport(req, studentId);
+
+  const { exams, examById } = await loadApprovedExams(req.schoolId, academicYear, classId);
+  if (!exams.length) throw ApiError.notFound('No approved exams found for this class/academic year');
+
+  const marks = await Mark.find({ exam: { $in: exams.map((e) => e._id) }, student: studentId }).populate('subject', 'name');
+  if (!marks.length) throw ApiError.notFound('No marks recorded for this student yet');
+
+  const student = await Student.findById(studentId).select('firstName lastName admissionNumber');
+  const report = computeTermReportCard(Array.from(marksToSubjectEntries(marks, examById).values()));
+
+  sendSuccess(res, { data: { student, academicYear, examsIncluded: exams.length, ...report } });
+});
+
+// Ranks every active student in a class (optionally narrowed to one section)
+// by their term-weighted overall percentage — ties share the same rank.
+export const getTermRanking = asyncHandler(async (req, res) => {
+  const { academicYear, class: classId, section } = req.query;
+  if (!academicYear || !classId) throw ApiError.badRequest('academicYear and class are required');
+
+  const { exams, examById } = await loadApprovedExams(req.schoolId, academicYear, classId);
+  if (!exams.length) throw ApiError.notFound('No approved exams found for this class/academic year');
+
+  const studentFilter = { school: req.schoolId, class: classId, status: 'active' };
+  if (section) studentFilter.section = section;
+  const students = await Student.find(studentFilter).select('firstName lastName admissionNumber');
+  if (!students.length) throw ApiError.notFound('No active students found');
+
+  const marks = await Mark.find({
+    exam: { $in: exams.map((e) => e._id) },
+    student: { $in: students.map((s) => s._id) },
+  }).populate('subject', 'name');
+
+  const byStudent = new Map();
+  marks.forEach((m) => {
+    const sid = m.student.toString();
+    if (!byStudent.has(sid)) byStudent.set(sid, []);
+  });
+  marks.forEach((m) => {
+    const sid = m.student.toString();
+    const key = m.subject._id.toString();
+    let entry = byStudent.get(sid).find((e) => e.key === key);
+    if (!entry) {
+      entry = { key, subject: m.subject.name, entries: [] };
+      byStudent.get(sid).push(entry);
+    }
+    const exam = examById.get(m.exam.toString());
+    entry.entries.push({ obtained: m.obtainedMarks, total: m.maxMarks, weight: exam?.weight, category: exam?.category });
+  });
+
+  const studentById = new Map(students.map((s) => [s._id.toString(), s]));
+  const rows = Array.from(byStudent.entries())
+    .filter(([, subjectEntries]) => subjectEntries.length)
+    .map(([sid, subjectEntries]) => {
+      const report = computeTermReportCard(subjectEntries);
+      return { student: studentById.get(sid), percentage: report.percentage, gpa: report.gpa, grade: report.grade, result: report.result };
+    });
+
+  sendSuccess(res, { data: rankByPercentage(rows) });
 });

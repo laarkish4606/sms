@@ -12,12 +12,20 @@ router
   .get(controller.listExams)
   .post(authorize('school_admin'), createExamValidator, validate, controller.createExam);
 
+router.get(
+  '/term-report',
+  authorize('school_admin', 'teacher', 'student', 'parent'),
+  controller.getTermReportCard
+);
+router.get('/term-ranking', authorize('school_admin', 'teacher'), controller.getTermRanking);
+
 router
   .route('/:id')
   .get(controller.getExam)
   .patch(authorize('school_admin'), controller.updateExam)
   .delete(authorize('school_admin'), controller.deleteExam);
 
+router.patch('/:id/submit', authorize('school_admin', 'teacher'), controller.submitExam);
 router.patch('/:id/publish', authorize('school_admin'), controller.publishExam);
 
 router.post(

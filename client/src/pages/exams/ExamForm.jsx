@@ -2,7 +2,25 @@ import { useEffect, useState } from 'react';
 import { Trash2, Plus } from 'lucide-react';
 import Spinner from '../../components/Spinner.jsx';
 
-const EMPTY_FORM = { name: '', academicYear: '', class: '', startDate: '', endDate: '', subjects: [] };
+const CATEGORIES = [
+  { value: 'assignment', label: 'Assignment' },
+  { value: 'quiz', label: 'Quiz' },
+  { value: 'midterm', label: 'Midterm' },
+  { value: 'final', label: 'Final' },
+  { value: 'practical', label: 'Practical' },
+  { value: 'other', label: 'Other' },
+];
+
+const EMPTY_FORM = {
+  name: '',
+  academicYear: '',
+  class: '',
+  startDate: '',
+  endDate: '',
+  category: 'final',
+  weight: 100,
+  subjects: [],
+};
 
 export default function ExamForm({ onSubmit, isSubmitting, academicYears, classes, subjects }) {
   const [values, setValues] = useState(EMPTY_FORM);
@@ -18,6 +36,7 @@ export default function ExamForm({ onSubmit, isSubmitting, academicYears, classe
     e.preventDefault();
     onSubmit({
       ...values,
+      weight: Number(values.weight),
       subjects: values.subjects.map((s) => ({ ...s, maxMarks: Number(s.maxMarks), passMarks: Number(s.passMarks) })),
     });
   };
@@ -62,6 +81,34 @@ export default function ExamForm({ onSubmit, isSubmitting, academicYears, classe
         <div>
           <label className="label">End date</label>
           <input type="date" className="input" value={values.endDate} onChange={(e) => setValues((v) => ({ ...v, endDate: e.target.value }))} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className="label">Assessment category</label>
+          <select className="input" value={values.category} onChange={(e) => setValues((v) => ({ ...v, category: e.target.value }))}>
+            {CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label">Weight toward term grade (%)</label>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            className="input"
+            value={values.weight}
+            onChange={(e) => setValues((v) => ({ ...v, weight: e.target.value }))}
+          />
+          <p className="mt-1 text-xs text-gray-400">
+            How much this exam counts toward the subject's overall term grade, relative to other exams in the same
+            subject (e.g. Quiz 15%, Midterm 25%, Final 40%).
+          </p>
         </div>
       </div>
 

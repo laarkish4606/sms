@@ -6,13 +6,25 @@ export const dashboardApi = baseApi.injectEndpoints({
     getAdminDashboard: builder.query({
       query: () => '/dashboard/admin',
     }),
+    getAccountantDashboard: builder.query({
+      query: () => '/dashboard/accountant',
+    }),
     getTeacherDashboard: builder.query({
       query: () => '/dashboard/teacher',
     }),
     getStudentDashboard: builder.query({
       query: (params) => `/dashboard/student${buildQueryString(params)}`,
     }),
+    getParentDashboard: builder.query({
+      query: () => '/dashboard/parent',
+    }),
   }),
 });
 
-export const { useGetAdminDashboardQuery, useGetTeacherDashboardQuery, useGetStudentDashboardQuery } = dashboardApi;
+export const {
+  useGetAdminDashboardQuery,
+  useGetAccountantDashboardQuery,
+  useGetTeacherDashboardQuery,
+  useGetStudentDashboardQuery,
+  useGetParentDashboardQuery,
+} = dashboardApi;

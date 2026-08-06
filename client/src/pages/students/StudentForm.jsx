@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import Spinner from '../../components/Spinner.jsx';
 import { useListSectionsQuery } from '../../api/academicApi.js';
+
+const MIN_ENROLLMENT_AGE = 3;
+
+function isOldEnough(dob) {
+  const birthDate = new Date(dob);
+  const cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - MIN_ENROLLMENT_AGE);
+  return birthDate <= cutoff;
+}
 
 const EMPTY_FORM = {
   firstName: '',
@@ -41,6 +51,10 @@ export default function StudentForm({ initialValues, onSubmit, isSubmitting, cla
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (values.dob && !isOldEnough(values.dob)) {
+      toast.error(`Student must be at least ${MIN_ENROLLMENT_AGE} years old to be enrolled`);
+      return;
+    }
     const payload = { ...values };
     if (isEdit) {
       delete payload.email;
@@ -78,7 +92,15 @@ export default function StudentForm({ initialValues, onSubmit, isSubmitting, cla
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label className="label">Date of birth</label>
-          <input type="date" className="input" required value={values.dob} onChange={handleChange('dob')} />
+          <input
+            type="date"
+            className="input"
+            required
+            max={new Date(new Date().setFullYear(new Date().getFullYear() - MIN_ENROLLMENT_AGE)).toISOString().slice(0, 10)}
+            value={values.dob}
+            onChange={handleChange('dob')}
+          />
+          <p className="mt-1 text-xs text-gray-400">Must be at least {MIN_ENROLLMENT_AGE} years old.</p>
         </div>
         <div>
           <label className="label">Gender</label>

@@ -33,6 +33,7 @@ const ExamsPage = lazy(() => import('./pages/exams/ExamsPage.jsx'));
 const EnterMarksPage = lazy(() => import('./pages/exams/EnterMarksPage.jsx'));
 const ExamResultsPage = lazy(() => import('./pages/exams/ExamResultsPage.jsx'));
 const ReportCardPage = lazy(() => import('./pages/exams/ReportCardPage.jsx'));
+const ClassRankingPage = lazy(() => import('./pages/exams/ClassRankingPage.jsx'));
 const FeesPage = lazy(() => import('./pages/fees/FeesPage.jsx'));
 const LibraryPage = lazy(() => import('./pages/library/LibraryPage.jsx'));
 const TransportPage = lazy(() => import('./pages/transport/TransportPage.jsx'));
@@ -122,6 +123,7 @@ export default function App() {
                 <Route element={<RoleRoute roles={['school_admin', 'teacher']} />}>
                   <Route path="/exams/:examId/marks" element={<EnterMarksPage />} />
                   <Route path="/exams/:examId/results" element={<ExamResultsPage />} />
+                  <Route path="/exams/ranking" element={<ClassRankingPage />} />
                 </Route>
 
                 <Route element={<RoleRoute roles={['school_admin', 'accountant', 'student', 'parent']} />}>
