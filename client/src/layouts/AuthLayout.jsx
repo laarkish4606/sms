@@ -1,84 +1,121 @@
 import { Outlet } from 'react-router-dom';
-import { GraduationCap, BookOpen, Award, Users, CalendarCheck } from 'lucide-react';
-import ThemeToggle from '../components/ThemeToggle.jsx';
+import { GraduationCap, CalendarCheck, BarChart3, DollarSign, MessageCircle, Users, ShieldCheck } from 'lucide-react';
+import AuthThemeToggle from '../components/AuthThemeToggle.jsx';
+
+const FEATURES = [
+  { icon: CalendarCheck, title: 'Attendance', subtitle: 'Track in real-time' },
+  { icon: BarChart3, title: 'Grades', subtitle: 'Analyze performance' },
+  { icon: DollarSign, title: 'Fees', subtitle: 'Manage collections' },
+  { icon: MessageCircle, title: 'Communication', subtitle: 'Stay connected' },
+  { icon: Users, title: 'Students', subtitle: 'Manage records' },
+  { icon: ShieldCheck, title: 'Secure', subtitle: 'Data protection' },
+];
 
 export default function AuthLayout() {
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
-      <div className="absolute right-4 top-4 z-10">
-        <ThemeToggle />
-      </div>
-
       {/* Hero panel — hidden on small screens so mobile goes straight to the form. */}
-      <div className="relative hidden w-1/2 overflow-hidden bg-gradient-to-br from-primary-600 via-primary-500 to-indigo-700 lg:flex lg:flex-col lg:justify-between lg:p-12">
+      <div className="relative hidden w-1/2 overflow-hidden bg-gradient-to-br from-[#1e1b4b] via-[#312e81] to-[#4c1d95] lg:flex lg:flex-col lg:justify-between lg:rounded-r-[3rem] lg:p-10 xl:p-12">
         <div
           className="pointer-events-none absolute inset-0 opacity-20"
           style={{
-            backgroundImage:
-              'radial-gradient(circle at 20% 20%, white 1px, transparent 1px), radial-gradient(circle at 80% 60%, white 1px, transparent 1px)',
-            backgroundSize: '48px 48px, 64px 64px',
+            backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 1px)',
+            backgroundSize: '28px 28px',
+            maskImage: 'radial-gradient(circle at 80% 15%, black, transparent 55%)',
           }}
         />
-        <div className="pointer-events-none absolute -left-24 -top-24 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 -right-16 h-96 w-96 rounded-full bg-black/10 blur-3xl" />
+        <div className="pointer-events-none absolute -left-24 top-1/3 h-80 w-80 rounded-full bg-primary-500/20 blur-3xl" />
 
-        <div className="relative flex items-center gap-2.5 text-white">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 backdrop-blur">
-            <GraduationCap size={22} />
+        <div className="relative space-y-8">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-primary-600 shadow-lg">
+              <GraduationCap size={24} />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-white">School Management System</p>
+              <p className="text-sm text-primary-200">Smart School, Better Future</p>
+            </div>
           </div>
-          <span className="text-lg font-bold">School Management System</span>
-        </div>
 
-        <div className="relative max-w-md">
-          <h2 className="text-3xl font-bold leading-tight text-white">
-            Everything your school needs, in one place.
-          </h2>
-          <p className="mt-3 text-primary-50/90">
-            Attendance, grading, fees, and communication for administrators, teachers, students, and parents —
-            all in one connected platform.
+          <span className="inline-block rounded-full bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-primary-100 backdrop-blur">
+            ALL-IN-ONE SOLUTION
+          </span>
+
+          <h1 className="text-4xl font-extrabold leading-tight text-white xl:text-5xl">
+            Manage Smarter.
+            <br />
+            <span className="bg-gradient-to-r from-primary-300 to-primary-100 bg-clip-text text-transparent">
+              Educate Better.
+            </span>
+          </h1>
+          <p className="max-w-md text-primary-100/80">
+            A complete platform for schools to manage students, attendance, grading, fees, communication and much
+            more efficiently.
           </p>
 
-          <div className="mt-8 grid grid-cols-2 gap-4">
-            {[
-              { icon: CalendarCheck, label: 'Attendance' },
-              { icon: Award, label: 'Grading' },
-              { icon: Users, label: 'Communication' },
-              { icon: BookOpen, label: 'Academics' },
-            ].map(({ icon: Icon, label }) => (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {FEATURES.map(({ icon: Icon, title, subtitle }) => (
               <div
-                key={label}
-                className="flex items-center gap-2.5 rounded-xl border border-white/15 bg-white/10 px-3.5 py-3 text-sm font-medium text-white backdrop-blur transition-colors hover:bg-white/15"
+                key={title}
+                className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur transition-colors hover:bg-white/10"
               >
-                <Icon size={18} />
-                {label}
+                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-primary-500/30 text-primary-100">
+                  <Icon size={18} />
+                </div>
+                <p className="text-sm font-semibold text-white">{title}</p>
+                <p className="text-xs text-primary-200/80">{subtitle}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <p className="relative text-xs text-primary-50/70">© {new Date().getFullYear()} School Management System</p>
+        {/* Simple dusk skyline illustration for the school building. */}
+        <div className="relative -mx-10 mt-10 h-40 xl:-mx-12">
+          <svg viewBox="0 0 600 160" className="h-full w-full" preserveAspectRatio="xMidYMax slice">
+            <rect x="40" y="60" width="200" height="100" rx="4" fill="#1e1b4b" opacity="0.9" />
+            <rect x="240" y="30" width="140" height="130" rx="4" fill="#2e2a6b" />
+            <rect x="380" y="70" width="180" height="90" rx="4" fill="#1e1b4b" opacity="0.9" />
+            {Array.from({ length: 24 }).map((_, i) => (
+              <rect
+                key={i}
+                x={260 + (i % 6) * 20}
+                y={45 + Math.floor(i / 6) * 22}
+                width="10"
+                height="12"
+                rx="1.5"
+                fill="#fbbf24"
+                opacity={i % 3 === 0 ? 0.25 : 0.9}
+              />
+            ))}
+            {Array.from({ length: 8 }).map((_, i) => (
+              <rect key={`l-${i}`} x={55 + (i % 4) * 42} y={80 + Math.floor(i / 4) * 30} width="14" height="16" rx="1.5" fill="#fbbf24" opacity="0.8" />
+            ))}
+            {Array.from({ length: 8 }).map((_, i) => (
+              <rect key={`r-${i}`} x={400 + (i % 4) * 38} y={90 + Math.floor(i / 4) * 30} width="14" height="16" rx="1.5" fill="#fbbf24" opacity="0.8" />
+            ))}
+          </svg>
+        </div>
+
+        <div className="relative flex justify-center">
+          <span className="rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-medium text-primary-100 backdrop-blur">
+            Secure • Reliable • Efficient
+          </span>
+        </div>
       </div>
 
       {/* Form panel */}
-      <div className="flex w-full flex-1 items-center justify-center px-4 py-12 lg:w-1/2">
-        <div className="w-full max-w-md animate-fadeIn">
-          <div className="mb-8 flex flex-col items-center gap-3 text-center lg:items-start lg:text-left">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-600 to-primary-500 text-white shadow-sm shadow-primary-600/30 lg:hidden">
-              <GraduationCap size={26} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                Welcome to the School Management System
-              </h1>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Please sign in using your school credentials to continue.
-              </p>
-            </div>
-          </div>
-          <div className="card p-6 sm:p-8">
-            <Outlet />
-          </div>
+      <div className="relative flex w-full flex-1 flex-col items-center justify-center px-4 py-12 lg:w-1/2">
+        <div className="absolute right-4 top-4 sm:right-8 sm:top-8">
+          <AuthThemeToggle />
         </div>
+
+        <div className="w-full max-w-md animate-fadeIn">
+          <Outlet />
+        </div>
+
+        <p className="mt-8 text-center text-xs text-gray-400 dark:text-gray-500">
+          © {new Date().getFullYear()} School Management System. All rights reserved.
+        </p>
       </div>
     </div>
   );
